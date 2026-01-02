@@ -65,11 +65,78 @@
 
 ### 安装
 
+**方式一：一键安装（推荐）**
+
 ```bash
+# 克隆项目
 git clone https://github.com/yourusername/linux-driver-analyzer.git
 cd linux-driver-analyzer
-pip install -r requirements.txt
+
+# 一键安装（自动创建虚拟环境，跨平台通用）
+./scripts/setup.sh
+
+# 激活环境后使用
+source .venv/bin/activate
 ```
+
+**方式二：手动安装**
+
+```bash
+cd linux-driver-analyzer
+
+# 创建虚拟环境（推荐，避免权限问题）
+python3 -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
+
+# 安装（推荐配置，包含 tree-sitter）
+pip install ".[recommended]"
+```
+
+<details>
+<summary><b>📦 各平台安装说明（点击展开）</b></summary>
+
+#### Ubuntu / Debian
+
+```bash
+# 安装 Python
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+
+# 克隆并安装
+git clone https://github.com/yourusername/linux-driver-analyzer.git
+cd linux-driver-analyzer
+./scripts/setup.sh
+source .venv/bin/activate
+```
+
+#### macOS
+
+```bash
+# 安装 Python（使用 Homebrew）
+brew install python
+
+# 克隆并安装
+git clone https://github.com/yourusername/linux-driver-analyzer.git
+cd linux-driver-analyzer
+./scripts/setup.sh
+source .venv/bin/activate
+```
+
+#### Windows (PowerShell)
+
+```powershell
+# 从 python.org 安装 Python 后
+git clone https://github.com/yourusername/linux-driver-analyzer.git
+cd linux-driver-analyzer
+
+# 创建虚拟环境
+python -m venv .venv
+.venv\Scripts\Activate
+pip install ".[recommended]"
+```
+
+</details>
 
 ### 分析驱动代码
 
@@ -79,13 +146,23 @@ python src/core/basic_analyzer.py your_driver.c -o result.json
 
 # 高级分析 - 包含结构体关系
 python src/core/advanced_analyzer.py your_driver.c --structs -o result.json
+
+# 使用新的后端 API
+python -c "
+from backends import get_backend
+backend = get_backend()  # 自动选择最佳后端
+result = backend.parse_file('your_driver.c')
+print(f'发现 {len(result.functions)} 个函数')
+"
 ```
 
 ### 可视化查看
 
 ```bash
 # 方法1：直接打开HTML文件
-open web/templates/call_flow_viewer.html
+open web/templates/call_flow_viewer.html      # macOS
+xdg-open web/templates/call_flow_viewer.html  # Linux
+start web/templates/call_flow_viewer.html     # Windows
 
 # 方法2：启动本地服务器
 python -m http.server 8080 --directory web
@@ -173,7 +250,7 @@ linux-driver-analyzer/
 | 阶段 | 目标 | 状态 |
 |------|------|------|
 | v0.1 | 基础分析 + Web可视化 | ✅ 完成 |
-| v0.2 | tree-sitter 后端 | 🚧 进行中 |
+| v0.2 | tree-sitter 后端 | ✅ 完成 |
 | v0.3 | libclang 后端 | 📅 计划中 |
 | v0.4 | 跨文件分析 | 📅 计划中 |
 | v1.0 | VSCode 插件 | 📅 计划中 |
