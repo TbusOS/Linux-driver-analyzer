@@ -586,7 +586,11 @@
             <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
                 📤 导入JSON
             </button>
-            <button class="btn" onclick="loadDemo()">💡 加载示例</button>
+            <select id="demo-select" class="btn" onchange="loadDemoByName(this.value)" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;">
+                <option value="">💡 选择示例...</option>
+                <option value="usb_serial">USB串口驱动</option>
+                <option value="async_demo">异步机制演示</option>
+            </select>
         </div>
     </div>
     
@@ -995,6 +999,35 @@
         // 加载示例
         function loadDemo() {
             renderAnalysis(demoData);
+        }
+        
+        // 通过名称加载示例
+        async function loadDemoByName(name) {
+            if (!name) return;
+            
+            const demoFiles = {
+                'usb_serial': '../../examples/usb_serial/basic_analysis.json',
+                'async_demo': '../../examples/async_demo/basic_analysis.json'
+            };
+            
+            const filePath = demoFiles[name];
+            if (!filePath) {
+                alert('未知示例: ' + name);
+                return;
+            }
+            
+            try {
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                const data = await response.json();
+                renderAnalysis(data);
+                document.getElementById('demo-select').value = '';
+            } catch (err) {
+                alert('加载失败: ' + err.message + '\\n请确保服务器正在运行');
+                document.getElementById('demo-select').value = '';
+            }
         }
         
         // 渲染分析结果

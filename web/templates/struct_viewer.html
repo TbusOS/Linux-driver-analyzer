@@ -296,15 +296,19 @@
         /* 函数调用图 */
         .call-node rect {
             stroke: var(--accent-yellow);
+            fill: rgba(210, 153, 34, 0.1);
+            stroke-width: 1.5;
         }
         
         .call-node.entry rect {
             stroke: var(--accent-green);
-            fill: rgba(63, 185, 80, 0.1);
+            fill: rgba(63, 185, 80, 0.15);
+            stroke-width: 2;
         }
         
         .call-node.kernel rect {
             stroke: var(--accent-blue);
+            fill: rgba(88, 166, 255, 0.1);
             stroke-dasharray: 4;
         }
         
@@ -422,7 +426,11 @@
         <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
             📤 导入分析结果
         </button>
-        <button class="btn" onclick="loadDemo()">💡 加载示例</button>
+        <select id="demo-select" class="btn" onchange="loadDemoByName(this.value)" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer;">
+            <option value="">💡 选择示例...</option>
+            <option value="usb_serial">USB串口驱动</option>
+            <option value="async_demo">异步机制演示</option>
+        </select>
     </div>
     
     <input type="file" id="file-input" accept=".json" onchange="handleFileUpload(event)" />
@@ -551,6 +559,35 @@
         function loadDemo() {
             analysisData = demoData;
             renderAll();
+        }
+        
+        // 通过名称加载示例
+        async function loadDemoByName(name) {
+            if (!name) return;
+            
+            const demoFiles = {
+                'usb_serial': '../../examples/usb_serial/advanced_analysis.json',
+                'async_demo': '../../examples/async_demo/advanced_analysis.json'
+            };
+            
+            const filePath = demoFiles[name];
+            if (!filePath) {
+                alert('未知示例: ' + name);
+                return;
+            }
+            
+            try {
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                analysisData = await response.json();
+                renderAll();
+                document.getElementById('demo-select').value = '';
+            } catch (err) {
+                alert('加载失败: ' + err.message + '\\n请确保服务器正在运行');
+                document.getElementById('demo-select').value = '';
+            }
         }
         
         function switchTab(tabId) {
@@ -845,8 +882,8 @@
                 // 入口函数节点
                 svgContent += `
                     <g class="call-node entry" transform="translate(50, ${y})">
-                        <rect width="180" height="${nodeHeight}" />
-                        <text x="90" y="22" text-anchor="middle" fill="var(--accent-green)">${func.name}()</text>
+                        <rect width="180" height="${nodeHeight}" rx="4" ry="4" />
+                        <text x="90" y="22" text-anchor="middle" fill="var(--accent-green)" font-size="13">${func.name}()</text>
                     </g>
                 `;
                 
@@ -861,10 +898,11 @@
                                          stroke="var(--accent-yellow)" marker-end="url(#call-arrow)" />`;
                     
                     // 被调用函数节点
+                    const textColor = isKernel ? 'var(--accent-blue)' : 'var(--accent-yellow)';
                     svgContent += `
                         <g class="call-node ${isKernel ? 'kernel' : ''}" transform="translate(360, ${callY})">
-                            <rect width="160" height="30" />
-                            <text x="80" y="20" text-anchor="middle">${call}()</text>
+                            <rect width="160" height="30" rx="3" ry="3" />
+                            <text x="80" y="20" text-anchor="middle" fill="${textColor}" font-size="12">${call}()</text>
                         </g>
                     `;
                 });
