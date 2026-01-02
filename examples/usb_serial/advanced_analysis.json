@@ -1,0 +1,657 @@
+{
+  "file": "examples/usb_serial/usb_serial_example.c",
+  "structs": {
+    "usb_serial_private": {
+      "name": "usb_serial_private",
+      "fields": [
+        {
+          "name": "lock",
+          "type_name": "spinlock_t",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 31,
+          "comment": ""
+        },
+        {
+          "name": "bulk_in_size",
+          "type_name": "size_t",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 39,
+          "comment": ""
+        },
+        {
+          "name": "bulk_out_size",
+          "type_name": "size_t",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 40,
+          "comment": ""
+        },
+        {
+          "name": "bulk_in_endpointAddr",
+          "type_name": "__u8",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 41,
+          "comment": ""
+        },
+        {
+          "name": "bulk_out_endpointAddr",
+          "type_name": "__u8",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 42,
+          "comment": ""
+        },
+        {
+          "name": "write_fifo",
+          "type_name": "struct kfifo",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 43,
+          "comment": ""
+        },
+        {
+          "name": "work",
+          "type_name": "struct work_struct",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 44,
+          "comment": ""
+        },
+        {
+          "name": "open_count",
+          "type_name": "int",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 45,
+          "comment": ""
+        },
+        {
+          "name": "mutex",
+          "type_name": "struct mutex",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 46,
+          "comment": ""
+        }
+      ],
+      "start_line": 30,
+      "end_line": 47,
+      "typedef_name": "",
+      "referenced_structs": [
+        "work_struct",
+        "kfifo",
+        "mutex"
+      ]
+    }
+  },
+  "functions": {
+    "serial_read_bulk_callback": {
+      "name": "serial_read_bulk_callback",
+      "return_type": "void",
+      "params": [
+        [
+          "struct urb *",
+          "urb"
+        ]
+      ],
+      "start_line": 51,
+      "end_line": 96,
+      "calls": [
+        "serial_read_bulk_callback",
+        "tty_insert_flip_char",
+        "tty_flip_buffer_push",
+        "dev_err",
+        "usb_submit_urb"
+      ],
+      "called_by": [
+        "serial_read_bulk_callback"
+      ],
+      "uses_structs": [
+        "urb"
+      ],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    },
+    "serial_write_bulk_callback": {
+      "name": "serial_write_bulk_callback",
+      "return_type": "void",
+      "params": [
+        [
+          "struct urb *",
+          "urb"
+        ]
+      ],
+      "start_line": 96,
+      "end_line": 112,
+      "calls": [
+        "serial_write_bulk_callback",
+        "schedule_work",
+        "dev_err"
+      ],
+      "called_by": [
+        "serial_write_bulk_callback"
+      ],
+      "uses_structs": [
+        "urb"
+      ],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    },
+    "serial_send_work": {
+      "name": "serial_send_work",
+      "return_type": "void",
+      "params": [
+        [
+          "struct work_struct *",
+          "work"
+        ]
+      ],
+      "start_line": 112,
+      "end_line": 151,
+      "calls": [
+        "kfifo_out",
+        "usb_submit_urb",
+        "dev_err",
+        "spin_unlock_irqrestore",
+        "spin_lock_irqsave",
+        "serial_send_work"
+      ],
+      "called_by": [
+        "serial_send_work"
+      ],
+      "uses_structs": [
+        "work_struct"
+      ],
+      "is_callback": true,
+      "callback_context": "async_work",
+      "attributes": [
+        "static"
+      ]
+    },
+    "serial_open": {
+      "name": "serial_open",
+      "return_type": "int",
+      "params": [
+        [
+          "struct tty_struct *",
+          "tty"
+        ],
+        [
+          "struct file *",
+          "filp"
+        ]
+      ],
+      "start_line": 151,
+      "end_line": 192,
+      "calls": [
+        "serial_open",
+        "usb_submit_urb",
+        "mutex_lock",
+        "dev_err",
+        "usb_fill_bulk_urb",
+        "usb_rcvbulkpipe",
+        "mutex_unlock"
+      ],
+      "called_by": [
+        "serial_open"
+      ],
+      "uses_structs": [
+        "tty_struct",
+        "file"
+      ],
+      "is_callback": true,
+      "callback_context": "tty_operations.open",
+      "attributes": [
+        "static"
+      ]
+    },
+    "serial_close": {
+      "name": "serial_close",
+      "return_type": "void",
+      "params": [
+        [
+          "struct tty_struct *",
+          "tty"
+        ],
+        [
+          "struct file *",
+          "filp"
+        ]
+      ],
+      "start_line": 192,
+      "end_line": 219,
+      "calls": [
+        "mutex_lock",
+        "usb_kill_urb",
+        "serial_close",
+        "cancel_work_sync",
+        "mutex_unlock"
+      ],
+      "called_by": [
+        "serial_close"
+      ],
+      "uses_structs": [
+        "tty_struct",
+        "file"
+      ],
+      "is_callback": true,
+      "callback_context": "tty_operations.close",
+      "attributes": [
+        "static"
+      ]
+    },
+    "serial_write": {
+      "name": "serial_write",
+      "return_type": "int",
+      "params": [
+        [
+          "struct tty_struct *",
+          "tty"
+        ],
+        [
+          "const unsigned char *",
+          "buf"
+        ],
+        [
+          "int",
+          "count"
+        ]
+      ],
+      "start_line": 219,
+      "end_line": 243,
+      "calls": [
+        "serial_write",
+        "schedule_work",
+        "spin_unlock_irqrestore",
+        "spin_lock_irqsave",
+        "kfifo_in"
+      ],
+      "called_by": [
+        "serial_write"
+      ],
+      "uses_structs": [
+        "tty_struct"
+      ],
+      "is_callback": true,
+      "callback_context": "tty_operations.write",
+      "attributes": [
+        "static"
+      ]
+    },
+    "serial_write_room": {
+      "name": "serial_write_room",
+      "return_type": "int",
+      "params": [
+        [
+          "struct tty_struct *",
+          "tty"
+        ]
+      ],
+      "start_line": 243,
+      "end_line": 260,
+      "calls": [
+        "serial_write_room",
+        "spin_unlock_irqrestore",
+        "spin_lock_irqsave",
+        "kfifo_avail"
+      ],
+      "called_by": [
+        "serial_write_room"
+      ],
+      "uses_structs": [
+        "tty_struct"
+      ],
+      "is_callback": true,
+      "callback_context": "tty_operations.write_room",
+      "attributes": [
+        "static"
+      ]
+    },
+    "usb_serial_probe": {
+      "name": "usb_serial_probe",
+      "return_type": "int",
+      "params": [
+        [
+          "struct usb_interface *",
+          "interface"
+        ],
+        [
+          "const struct usb_device_id *",
+          "id"
+        ]
+      ],
+      "start_line": 268,
+      "end_line": 363,
+      "calls": [
+        "dev_info",
+        "usb_sndbulkpipe",
+        "usb_endpoint_is_bulk_out",
+        "usb_endpoint_is_bulk_in",
+        "kfifo_alloc",
+        "usb_endpoint_maxp",
+        "kzalloc",
+        "kfifo_free",
+        "kmalloc",
+        "usb_get_dev",
+        "usb_put_dev",
+        "INIT_WORK",
+        "kfree",
+        "usb_serial_probe",
+        "usb_fill_bulk_urb",
+        "usb_free_urb",
+        "usb_set_intfdata",
+        "dev_err",
+        "usb_alloc_urb",
+        "spin_lock_init",
+        "interface_to_usbdev",
+        "mutex_init"
+      ],
+      "called_by": [
+        "usb_serial_probe"
+      ],
+      "uses_structs": [
+        "usb_device_id",
+        "usb_interface"
+      ],
+      "is_callback": true,
+      "callback_context": "usb_driver.probe",
+      "attributes": [
+        "static"
+      ]
+    },
+    "usb_serial_disconnect": {
+      "name": "usb_serial_disconnect",
+      "return_type": "void",
+      "params": [
+        [
+          "struct usb_interface *",
+          "interface"
+        ]
+      ],
+      "start_line": 363,
+      "end_line": 390,
+      "calls": [
+        "dev_info",
+        "usb_free_urb",
+        "usb_set_intfdata",
+        "usb_get_intfdata",
+        "kfree",
+        "usb_kill_urb",
+        "kfifo_free",
+        "usb_put_dev",
+        "usb_serial_disconnect",
+        "cancel_work_sync"
+      ],
+      "called_by": [
+        "usb_serial_disconnect"
+      ],
+      "uses_structs": [
+        "usb_interface"
+      ],
+      "is_callback": true,
+      "callback_context": "usb_driver.disconnect",
+      "attributes": [
+        "static"
+      ]
+    },
+    "usb_serial_init": {
+      "name": "usb_serial_init",
+      "return_type": "int __init",
+      "params": [],
+      "start_line": 405,
+      "end_line": 446,
+      "calls": [
+        "tty_set_operations",
+        "alloc_tty_driver",
+        "put_tty_driver",
+        "usb_serial_init",
+        "pr_info",
+        "tty_unregister_driver",
+        "tty_register_driver",
+        "usb_register"
+      ],
+      "called_by": [
+        "usb_serial_init"
+      ],
+      "uses_structs": [],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    },
+    "usb_serial_exit": {
+      "name": "usb_serial_exit",
+      "return_type": "void __exit",
+      "params": [],
+      "start_line": 446,
+      "end_line": 459,
+      "calls": [
+        "put_tty_driver",
+        "usb_deregister",
+        "pr_info",
+        "usb_serial_exit",
+        "tty_unregister_driver"
+      ],
+      "called_by": [
+        "usb_serial_exit"
+      ],
+      "uses_structs": [],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    }
+  },
+  "func_ptr_assignments": [
+    {
+      "struct_type": "tty_operations",
+      "field_name": "open",
+      "func_name": "serial_open",
+      "var_name": "serial_ops",
+      "line": 263,
+      "context": ""
+    },
+    {
+      "struct_type": "tty_operations",
+      "field_name": "close",
+      "func_name": "serial_close",
+      "var_name": "serial_ops",
+      "line": 263,
+      "context": ""
+    },
+    {
+      "struct_type": "tty_operations",
+      "field_name": "write",
+      "func_name": "serial_write",
+      "var_name": "serial_ops",
+      "line": 263,
+      "context": ""
+    },
+    {
+      "struct_type": "tty_operations",
+      "field_name": "write_room",
+      "func_name": "serial_write_room",
+      "var_name": "serial_ops",
+      "line": 263,
+      "context": ""
+    },
+    {
+      "struct_type": "usb_driver",
+      "field_name": "probe",
+      "func_name": "usb_serial_probe",
+      "var_name": "usb_serial_driver",
+      "line": 400,
+      "context": ""
+    },
+    {
+      "struct_type": "usb_driver",
+      "field_name": "disconnect",
+      "func_name": "usb_serial_disconnect",
+      "var_name": "usb_serial_driver",
+      "line": 400,
+      "context": ""
+    }
+  ],
+  "struct_relations": {
+    "usb_serial_private": [
+      "work_struct",
+      "kfifo",
+      "mutex"
+    ]
+  },
+  "call_graph": {
+    "serial_read_bulk_callback": [
+      "serial_read_bulk_callback",
+      "tty_insert_flip_char",
+      "tty_flip_buffer_push",
+      "dev_err",
+      "usb_submit_urb"
+    ],
+    "serial_write_bulk_callback": [
+      "serial_write_bulk_callback",
+      "schedule_work",
+      "dev_err"
+    ],
+    "serial_send_work": [
+      "kfifo_out",
+      "usb_submit_urb",
+      "dev_err",
+      "spin_unlock_irqrestore",
+      "spin_lock_irqsave",
+      "serial_send_work"
+    ],
+    "serial_open": [
+      "serial_open",
+      "usb_submit_urb",
+      "mutex_lock",
+      "dev_err",
+      "usb_fill_bulk_urb",
+      "usb_rcvbulkpipe",
+      "mutex_unlock"
+    ],
+    "serial_close": [
+      "mutex_lock",
+      "usb_kill_urb",
+      "serial_close",
+      "cancel_work_sync",
+      "mutex_unlock"
+    ],
+    "serial_write": [
+      "serial_write",
+      "schedule_work",
+      "spin_unlock_irqrestore",
+      "spin_lock_irqsave",
+      "kfifo_in"
+    ],
+    "serial_write_room": [
+      "serial_write_room",
+      "spin_unlock_irqrestore",
+      "spin_lock_irqsave",
+      "kfifo_avail"
+    ],
+    "usb_serial_probe": [
+      "dev_info",
+      "usb_sndbulkpipe",
+      "usb_endpoint_is_bulk_out",
+      "usb_endpoint_is_bulk_in",
+      "kfifo_alloc",
+      "usb_endpoint_maxp",
+      "kzalloc",
+      "kfifo_free",
+      "kmalloc",
+      "usb_put_dev",
+      "usb_get_dev",
+      "INIT_WORK",
+      "kfree",
+      "usb_serial_probe",
+      "usb_fill_bulk_urb",
+      "usb_free_urb",
+      "usb_set_intfdata",
+      "dev_err",
+      "usb_alloc_urb",
+      "spin_lock_init",
+      "interface_to_usbdev",
+      "mutex_init"
+    ],
+    "usb_serial_disconnect": [
+      "dev_info",
+      "usb_free_urb",
+      "usb_set_intfdata",
+      "kfree",
+      "usb_get_intfdata",
+      "usb_kill_urb",
+      "kfifo_free",
+      "usb_put_dev",
+      "usb_serial_disconnect",
+      "cancel_work_sync"
+    ],
+    "usb_serial_init": [
+      "tty_set_operations",
+      "alloc_tty_driver",
+      "put_tty_driver",
+      "usb_serial_init",
+      "pr_info",
+      "tty_unregister_driver",
+      "tty_register_driver",
+      "usb_register"
+    ],
+    "usb_serial_exit": [
+      "put_tty_driver",
+      "usb_deregister",
+      "pr_info",
+      "usb_serial_exit",
+      "tty_unregister_driver"
+    ]
+  },
+  "summary": {
+    "total_structs": 1,
+    "total_functions": 11,
+    "total_callbacks": 7,
+    "callback_groups": {
+      "async_work": [
+        "serial_send_work"
+      ],
+      "tty_operations": [
+        "serial_open",
+        "serial_close",
+        "serial_write",
+        "serial_write_room"
+      ],
+      "usb_driver": [
+        "usb_serial_probe",
+        "usb_serial_disconnect"
+      ]
+    },
+    "func_ptr_assignments": 6,
+    "struct_with_relations": 1
+  }
+}

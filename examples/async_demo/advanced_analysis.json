@@ -1,0 +1,659 @@
+{
+  "file": "examples/async_demo/async_demo_example.c",
+  "structs": {
+    "async_demo_dev": {
+      "name": "async_demo_dev",
+      "fields": [
+        {
+          "name": "work",
+          "type_name": "struct work_struct",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 26,
+          "comment": ""
+        },
+        {
+          "name": "delayed_work",
+          "type_name": "struct delayed_work",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 27,
+          "comment": ""
+        },
+        {
+          "name": "tasklet",
+          "type_name": "struct tasklet_struct",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 30,
+          "comment": ""
+        },
+        {
+          "name": "timer",
+          "type_name": "struct timer_list",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 33,
+          "comment": ""
+        },
+        {
+          "name": "hrtimer",
+          "type_name": "struct hrtimer",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 34,
+          "comment": ""
+        },
+        {
+          "name": "thread_done",
+          "type_name": "struct completion",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 38,
+          "comment": ""
+        },
+        {
+          "name": "irq",
+          "type_name": "int",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 41,
+          "comment": ""
+        },
+        {
+          "name": "running",
+          "type_name": "atomic_t",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 44,
+          "comment": ""
+        },
+        {
+          "name": "lock",
+          "type_name": "spinlock_t",
+          "is_pointer": false,
+          "is_function_ptr": false,
+          "func_ptr_signature": "",
+          "array_size": "",
+          "line": 45,
+          "comment": ""
+        }
+      ],
+      "start_line": 22,
+      "end_line": 46,
+      "typedef_name": "",
+      "referenced_structs": [
+        "hrtimer",
+        "work_struct",
+        "tasklet_struct",
+        "completion",
+        "delayed_work",
+        "timer_list"
+      ]
+    }
+  },
+  "functions": {
+    "demo_work_handler": {
+      "name": "demo_work_handler",
+      "return_type": "void",
+      "params": [
+        [
+          "struct work_struct *",
+          "work"
+        ]
+      ],
+      "start_line": 48,
+      "end_line": 65,
+      "calls": [
+        "msleep",
+        "开始处理",
+        "mutex_lock",
+        "mutex_unlock",
+        "demo_work_handler",
+        "pr_info"
+      ],
+      "called_by": [
+        "demo_work_handler"
+      ],
+      "uses_structs": [
+        "work_struct"
+      ],
+      "is_callback": true,
+      "callback_context": "async_work",
+      "attributes": [
+        "static"
+      ]
+    },
+    "demo_delayed_work_handler": {
+      "name": "demo_delayed_work_handler",
+      "return_type": "void",
+      "params": [
+        [
+          "struct work_struct *",
+          "work"
+        ]
+      ],
+      "start_line": 65,
+      "end_line": 77,
+      "calls": [
+        "msecs_to_jiffies",
+        "to_delayed_work",
+        "atomic_read",
+        "demo_delayed_work_handler",
+        "schedule_delayed_work",
+        "pr_info"
+      ],
+      "called_by": [
+        "demo_delayed_work_handler"
+      ],
+      "uses_structs": [
+        "work_struct"
+      ],
+      "is_callback": true,
+      "callback_context": "async_delayed_work",
+      "attributes": [
+        "static"
+      ]
+    },
+    "demo_tasklet_handler": {
+      "name": "demo_tasklet_handler",
+      "return_type": "void",
+      "params": [
+        [
+          "unsigned long",
+          "data"
+        ]
+      ],
+      "start_line": 77,
+      "end_line": 95,
+      "calls": [
+        "schedule_work",
+        "spin_unlock_irqrestore",
+        "软中断上下文处理",
+        "demo_tasklet_handler",
+        "spin_lock_irqsave",
+        "pr_info"
+      ],
+      "called_by": [
+        "demo_tasklet_handler"
+      ],
+      "uses_structs": [],
+      "is_callback": true,
+      "callback_context": "async_tasklet",
+      "attributes": [
+        "static"
+      ]
+    },
+    "demo_timer_callback": {
+      "name": "demo_timer_callback",
+      "return_type": "void",
+      "params": [
+        [
+          "struct timer_list *",
+          "t"
+        ]
+      ],
+      "start_line": 95,
+      "end_line": 111,
+      "calls": [
+        "msecs_to_jiffies",
+        "from_timer",
+        "到期回调",
+        "mod_timer",
+        "atomic_read",
+        "demo_timer_callback",
+        "tasklet_schedule",
+        "pr_info"
+      ],
+      "called_by": [
+        "demo_timer_callback"
+      ],
+      "uses_structs": [
+        "timer_list"
+      ],
+      "is_callback": true,
+      "callback_context": "async_timer",
+      "attributes": [
+        "static"
+      ]
+    },
+    "demo_hrtimer_callback": {
+      "name": "demo_hrtimer_callback",
+      "return_type": "enum hrtimer_restart",
+      "params": [
+        [
+          "struct hrtimer *",
+          "timer"
+        ]
+      ],
+      "start_line": 111,
+      "end_line": 126,
+      "calls": [
+        "demo_hrtimer_callback",
+        "ms_to_ktime",
+        "atomic_read",
+        "纳秒级精度回调",
+        "hrtimer_forward_now",
+        "pr_info"
+      ],
+      "called_by": [
+        "demo_hrtimer_callback"
+      ],
+      "uses_structs": [
+        "hrtimer"
+      ],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    },
+    "demo_irq_handler": {
+      "name": "demo_irq_handler",
+      "return_type": "irqreturn_t",
+      "params": [
+        [
+          "int",
+          "irq"
+        ],
+        [
+          "void *",
+          "dev_id"
+        ]
+      ],
+      "start_line": 126,
+      "end_line": 141,
+      "calls": [
+        "demo_irq_handler",
+        "tasklet_schedule",
+        "pr_info"
+      ],
+      "called_by": [
+        "demo_irq_handler"
+      ],
+      "uses_structs": [],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    },
+    "demo_irq_thread_handler": {
+      "name": "demo_irq_thread_handler",
+      "return_type": "irqreturn_t",
+      "params": [
+        [
+          "int",
+          "irq"
+        ],
+        [
+          "void *",
+          "dev_id"
+        ]
+      ],
+      "start_line": 141,
+      "end_line": 153,
+      "calls": [
+        "msleep",
+        "demo_irq_thread_handler",
+        "pr_info",
+        "进程上下文处理下半部"
+      ],
+      "called_by": [
+        "demo_irq_thread_handler"
+      ],
+      "uses_structs": [],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    },
+    "demo_kthread_func": {
+      "name": "demo_kthread_func",
+      "return_type": "int",
+      "params": [
+        [
+          "void *",
+          "data"
+        ]
+      ],
+      "start_line": 153,
+      "end_line": 178,
+      "calls": [
+        "msleep_interruptible",
+        "kthread_should_stop",
+        "demo_kthread_func",
+        "pr_info",
+        "complete"
+      ],
+      "called_by": [
+        "demo_kthread_func"
+      ],
+      "uses_structs": [],
+      "is_callback": true,
+      "callback_context": "async_kthread",
+      "attributes": [
+        "static"
+      ]
+    },
+    "async_demo_probe": {
+      "name": "async_demo_probe",
+      "return_type": "int",
+      "params": [
+        [
+          "struct platform_device *",
+          "pdev"
+        ]
+      ],
+      "start_line": 178,
+      "end_line": 252,
+      "calls": [
+        "msecs_to_jiffies",
+        "PTR_ERR",
+        "schedule_delayed_work",
+        "pr_info",
+        "timer_setup",
+        "mod_timer",
+        "dev_err",
+        "devm_kzalloc",
+        "free_irq",
+        "INIT_WORK",
+        "hrtimer_start",
+        "kthread_run",
+        "request_threaded_irq",
+        "tasklet_init",
+        "platform_set_drvdata",
+        "init_completion",
+        "ms_to_ktime",
+        "IS_ERR",
+        "INIT_DELAYED_WORK",
+        "hrtimer_init",
+        "atomic_set",
+        "spin_lock_init",
+        "async_demo_probe"
+      ],
+      "called_by": [
+        "async_demo_probe"
+      ],
+      "uses_structs": [
+        "platform_device"
+      ],
+      "is_callback": true,
+      "callback_context": "platform_driver.probe",
+      "attributes": [
+        "static"
+      ]
+    },
+    "async_demo_remove": {
+      "name": "async_demo_remove",
+      "return_type": "int",
+      "params": [
+        [
+          "struct platform_device *",
+          "pdev"
+        ]
+      ],
+      "start_line": 252,
+      "end_line": 288,
+      "calls": [
+        "free_irq",
+        "async_demo_remove",
+        "del_timer_sync",
+        "kthread_stop",
+        "tasklet_kill",
+        "cancel_work_sync",
+        "cancel_delayed_work_sync",
+        "atomic_set",
+        "wait_for_completion",
+        "platform_get_drvdata",
+        "pr_info",
+        "hrtimer_cancel"
+      ],
+      "called_by": [
+        "async_demo_remove"
+      ],
+      "uses_structs": [
+        "platform_device"
+      ],
+      "is_callback": true,
+      "callback_context": "platform_driver.remove",
+      "attributes": [
+        "static"
+      ]
+    },
+    "async_demo_init": {
+      "name": "async_demo_init",
+      "return_type": "int __init",
+      "params": [],
+      "start_line": 297,
+      "end_line": 304,
+      "calls": [
+        "pr_info",
+        "platform_driver_register",
+        "async_demo_init"
+      ],
+      "called_by": [
+        "async_demo_init"
+      ],
+      "uses_structs": [],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    },
+    "async_demo_exit": {
+      "name": "async_demo_exit",
+      "return_type": "void __exit",
+      "params": [],
+      "start_line": 304,
+      "end_line": 311,
+      "calls": [
+        "pr_info",
+        "async_demo_exit",
+        "platform_driver_unregister"
+      ],
+      "called_by": [
+        "async_demo_exit"
+      ],
+      "uses_structs": [],
+      "is_callback": false,
+      "callback_context": "",
+      "attributes": [
+        "static"
+      ]
+    }
+  },
+  "func_ptr_assignments": [
+    {
+      "struct_type": "platform_driver",
+      "field_name": "probe",
+      "func_name": "async_demo_probe",
+      "var_name": "async_demo_driver",
+      "line": 291,
+      "context": ""
+    },
+    {
+      "struct_type": "platform_driver",
+      "field_name": "remove",
+      "func_name": "async_demo_remove",
+      "var_name": "async_demo_driver",
+      "line": 291,
+      "context": ""
+    },
+    {
+      "struct_type": "hrtimer",
+      "field_name": "function",
+      "func_name": "demo_hrtimer_callback",
+      "var_name": "hrtimer",
+      "line": 213,
+      "context": ""
+    }
+  ],
+  "struct_relations": {
+    "async_demo_dev": [
+      "hrtimer",
+      "work_struct",
+      "tasklet_struct",
+      "completion",
+      "delayed_work",
+      "timer_list"
+    ]
+  },
+  "call_graph": {
+    "demo_work_handler": [
+      "msleep",
+      "开始处理",
+      "mutex_lock",
+      "mutex_unlock",
+      "demo_work_handler",
+      "pr_info"
+    ],
+    "demo_delayed_work_handler": [
+      "msecs_to_jiffies",
+      "to_delayed_work",
+      "atomic_read",
+      "pr_info",
+      "schedule_delayed_work",
+      "demo_delayed_work_handler"
+    ],
+    "demo_tasklet_handler": [
+      "schedule_work",
+      "spin_unlock_irqrestore",
+      "软中断上下文处理",
+      "demo_tasklet_handler",
+      "spin_lock_irqsave",
+      "pr_info"
+    ],
+    "demo_timer_callback": [
+      "msecs_to_jiffies",
+      "from_timer",
+      "mod_timer",
+      "到期回调",
+      "atomic_read",
+      "demo_timer_callback",
+      "tasklet_schedule",
+      "pr_info"
+    ],
+    "demo_hrtimer_callback": [
+      "demo_hrtimer_callback",
+      "ms_to_ktime",
+      "atomic_read",
+      "纳秒级精度回调",
+      "hrtimer_forward_now",
+      "pr_info"
+    ],
+    "demo_irq_handler": [
+      "demo_irq_handler",
+      "tasklet_schedule",
+      "pr_info"
+    ],
+    "demo_irq_thread_handler": [
+      "msleep",
+      "demo_irq_thread_handler",
+      "pr_info",
+      "进程上下文处理下半部"
+    ],
+    "demo_kthread_func": [
+      "msleep_interruptible",
+      "kthread_should_stop",
+      "demo_kthread_func",
+      "pr_info",
+      "complete"
+    ],
+    "async_demo_probe": [
+      "msecs_to_jiffies",
+      "PTR_ERR",
+      "schedule_delayed_work",
+      "pr_info",
+      "timer_setup",
+      "mod_timer",
+      "dev_err",
+      "devm_kzalloc",
+      "free_irq",
+      "INIT_WORK",
+      "hrtimer_start",
+      "kthread_run",
+      "request_threaded_irq",
+      "tasklet_init",
+      "platform_set_drvdata",
+      "init_completion",
+      "ms_to_ktime",
+      "IS_ERR",
+      "INIT_DELAYED_WORK",
+      "hrtimer_init",
+      "atomic_set",
+      "spin_lock_init",
+      "async_demo_probe"
+    ],
+    "async_demo_remove": [
+      "del_timer_sync",
+      "async_demo_remove",
+      "kthread_stop",
+      "tasklet_kill",
+      "cancel_work_sync",
+      "wait_for_completion",
+      "atomic_set",
+      "pr_info",
+      "cancel_delayed_work_sync",
+      "free_irq",
+      "platform_get_drvdata",
+      "hrtimer_cancel"
+    ],
+    "async_demo_init": [
+      "pr_info",
+      "platform_driver_register",
+      "async_demo_init"
+    ],
+    "async_demo_exit": [
+      "pr_info",
+      "async_demo_exit",
+      "platform_driver_unregister"
+    ]
+  },
+  "summary": {
+    "total_structs": 1,
+    "total_functions": 12,
+    "total_callbacks": 7,
+    "callback_groups": {
+      "async_work": [
+        "demo_work_handler"
+      ],
+      "async_delayed_work": [
+        "demo_delayed_work_handler"
+      ],
+      "async_tasklet": [
+        "demo_tasklet_handler"
+      ],
+      "async_timer": [
+        "demo_timer_callback"
+      ],
+      "async_kthread": [
+        "demo_kthread_func"
+      ],
+      "platform_driver": [
+        "async_demo_probe",
+        "async_demo_remove"
+      ]
+    },
+    "func_ptr_assignments": 3,
+    "struct_with_relations": 1
+  }
+}

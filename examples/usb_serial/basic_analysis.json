@@ -1,0 +1,949 @@
+{
+  "file": "examples/usb_serial/usb_serial_example.c",
+  "functions": {
+    "serial_read_bulk_callback": {
+      "name": "serial_read_bulk_callback",
+      "return_type": "void",
+      "params": "struct urb *urb",
+      "start_line": 46,
+      "end_line": 91,
+      "body": "{\n    struct usb_serial_private *priv = urb->context;\n    struct tty_struct *tty;\n    unsigned char *data = urb->transfer_buffer;\n    int status = urb->status;\n    int result;\n    int i;\n    \n    \n    if (status) {\n        if (status == -ENOENT ||\n            status == -ECONNRESET ||\n            status == -ESHUTDOWN) {\n            \n            return;\n        } else {\n            dev_err(&priv->interface->dev,\n                    \"读URB错误: %d\\n\", status);\n            goto resubmit;\n        }\n    }\n    \n    \n    tty = priv->tty;\n    if (tty && urb->actual_length) {\n        \n        for (i = 0; i < urb->actual_length; i++) {\n            if (!tty_insert_flip_char(&tty->port, data[i], TTY_NORMAL)) {\n                dev_err(&priv->interface->dev, \"TTY缓冲区满\\n\");\n                break;\n            }\n        }\n        tty_flip_buffer_push(&tty->port);\n    }\n    \nresubmit:\n    \n    result = usb_submit_urb(urb, GFP_ATOMIC);\n    if (result)\n        dev_err(&priv->interface->dev,\n                \"重新提交读URB失败: %d\\n\", result);\n}",
+      "calls": [
+        "usb_submit_urb",
+        "tty_flip_buffer_push",
+        "tty_insert_flip_char",
+        "dev_err"
+      ],
+      "called_by": [],
+      "is_callback": false,
+      "callback_context": ""
+    },
+    "serial_write_bulk_callback": {
+      "name": "serial_write_bulk_callback",
+      "return_type": "void",
+      "params": "struct urb *urb",
+      "start_line": 91,
+      "end_line": 107,
+      "body": "{\n    struct usb_serial_private *priv = urb->context;\n    unsigned long flags;\n    \n    \n    if (urb->status) {\n        dev_err(&priv->interface->dev,\n                \"写URB错误: %d\\n\", urb->status);\n    }\n    \n    \n    schedule_work(&priv->work);\n}",
+      "calls": [
+        "schedule_work",
+        "dev_err"
+      ],
+      "called_by": [],
+      "is_callback": false,
+      "callback_context": ""
+    },
+    "serial_send_work": {
+      "name": "serial_send_work",
+      "return_type": "void",
+      "params": "struct work_struct *work",
+      "start_line": 107,
+      "end_line": 146,
+      "body": "{\n    struct usb_serial_private *priv = \n        container_of(work, struct usb_serial_private, work);\n    unsigned long flags;\n    int count;\n    int result;\n    \n    spin_lock_irqsave(&priv->lock, flags);\n    \n    \n    if (priv->write_urb->status == -EINPROGRESS) {\n        spin_unlock_irqrestore(&priv->lock, flags);\n        return;\n    }\n    \n    count = kfifo_out(&priv->write_fifo, \n                      priv->bulk_out_buffer,\n                      priv->bulk_out_size);\n    \n    if (count == 0) {\n        spin_unlock_irqrestore(&priv->lock, flags);\n        return;\n    }\n    \n    \n    priv->write_urb->transfer_buffer_length = count;\n    \n    spin_unlock_irqrestore(&priv->lock, flags);\n    \n    \n    result = usb_submit_urb(priv->write_urb, GFP_KERNEL);\n    if (result) {\n        dev_err(&priv->interface->dev,\n                \"提交写URB失败: %d\\n\", result);\n    }\n}",
+      "calls": [
+        "usb_submit_urb",
+        "spin_unlock_irqrestore",
+        "kfifo_out",
+        "dev_err",
+        "spin_lock_irqsave"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "async_work"
+    },
+    "serial_open": {
+      "name": "serial_open",
+      "return_type": "int",
+      "params": "struct tty_struct *tty, struct file *filp",
+      "start_line": 146,
+      "end_line": 187,
+      "body": "{\n    struct usb_serial_private *priv;\n    int index = tty->index;\n    int result = 0;\n    \n    \n    priv = tty->driver_data;\n    if (!priv)\n        return -ENODEV;\n    \n    mutex_lock(&priv->mutex);\n    \n    \n    priv->open_count++;\n    if (priv->open_count == 1) {\n        \n        priv->tty = tty;\n        \n        \n        usb_fill_bulk_urb(priv->read_urb, priv->udev,\n                         usb_rcvbulkpipe(priv->udev, priv->bulk_in_endpointAddr),\n                         priv->bulk_in_buffer,\n                         priv->bulk_in_size,\n                         serial_read_bulk_callback, priv);\n        \n        result = usb_submit_urb(priv->read_urb, GFP_KERNEL);\n        if (result) {\n            dev_err(&priv->interface->dev,\n                    \"提交读URB失败: %d\\n\", result);\n            priv->open_count--;\n            priv->tty = NULL;\n        }\n    }\n    \n    mutex_unlock(&priv->mutex);\n    \n    return result;\n}",
+      "calls": [
+        "usb_submit_urb",
+        "dev_err",
+        "usb_rcvbulkpipe",
+        "mutex_lock",
+        "mutex_unlock",
+        "usb_fill_bulk_urb"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "tty_operations.open"
+    },
+    "serial_close": {
+      "name": "serial_close",
+      "return_type": "void",
+      "params": "struct tty_struct *tty, struct file *filp",
+      "start_line": 187,
+      "end_line": 214,
+      "body": "{\n    struct usb_serial_private *priv = tty->driver_data;\n    \n    if (!priv)\n        return;\n    \n    mutex_lock(&priv->mutex);\n    \n    priv->open_count--;\n    if (priv->open_count == 0) {\n        \n        \n        \n        usb_kill_urb(priv->read_urb);\n        usb_kill_urb(priv->write_urb);\n        \n        \n        cancel_work_sync(&priv->work);\n        \n        priv->tty = NULL;\n    }\n    \n    mutex_unlock(&priv->mutex);\n}",
+      "calls": [
+        "usb_kill_urb",
+        "mutex_lock",
+        "mutex_unlock",
+        "cancel_work_sync"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "tty_operations.close"
+    },
+    "serial_write": {
+      "name": "serial_write",
+      "return_type": "int",
+      "params": "struct tty_struct *tty,\n                       const unsigned char *buf, int count",
+      "start_line": 214,
+      "end_line": 238,
+      "body": "{\n    struct usb_serial_private *priv = tty->driver_data;\n    unsigned long flags;\n    int retval;\n    \n    if (!priv)\n        return -ENODEV;\n    \n    spin_lock_irqsave(&priv->lock, flags);\n    \n    \n    retval = kfifo_in(&priv->write_fifo, buf, count);\n    \n    spin_unlock_irqrestore(&priv->lock, flags);\n    \n    \n    schedule_work(&priv->work);\n    \n    return retval;\n}",
+      "calls": [
+        "schedule_work",
+        "kfifo_in",
+        "spin_lock_irqsave",
+        "spin_unlock_irqrestore"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "tty_operations.write"
+    },
+    "serial_write_room": {
+      "name": "serial_write_room",
+      "return_type": "int",
+      "params": "struct tty_struct *tty",
+      "start_line": 238,
+      "end_line": 255,
+      "body": "{\n    struct usb_serial_private *priv = tty->driver_data;\n    unsigned long flags;\n    int room;\n    \n    if (!priv)\n        return 0;\n    \n    spin_lock_irqsave(&priv->lock, flags);\n    room = kfifo_avail(&priv->write_fifo);\n    spin_unlock_irqrestore(&priv->lock, flags);\n    \n    return room;\n}",
+      "calls": [
+        "kfifo_avail",
+        "spin_unlock_irqrestore",
+        "spin_lock_irqsave"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "tty_operations.write_room"
+    },
+    "usb_serial_probe": {
+      "name": "usb_serial_probe",
+      "return_type": "int",
+      "params": "struct usb_interface *interface,\n                          const struct usb_device_id *id",
+      "start_line": 263,
+      "end_line": 358,
+      "body": "{\n    struct usb_serial_private *priv;\n    struct usb_host_interface *iface_desc;\n    struct usb_endpoint_descriptor *endpoint;\n    struct usb_device *udev = interface_to_usbdev(interface);\n    int i;\n    int retval = -ENOMEM;\n    \n    \n    priv = kzalloc(sizeof(*priv), GFP_KERNEL);\n    if (!priv)\n        return -ENOMEM;\n    \n    \n    spin_lock_init(&priv->lock);\n    mutex_init(&priv->mutex);\n    priv->udev = usb_get_dev(udev);\n    priv->interface = interface;\n    INIT_WORK(&priv->work, serial_send_work);\n    \n    \n    iface_desc = interface->cur_altsetting;\n    for (i = 0; i < iface_desc->desc.bNumEndpoints; i++) {\n        endpoint = &iface_desc->endpoint[i].desc;\n        \n        if (usb_endpoint_is_bulk_in(endpoint)) {\n            priv->bulk_in_size = usb_endpoint_maxp(endpoint);\n            priv->bulk_in_endpointAddr = endpoint->bEndpointAddress;\n            priv->bulk_in_buffer = kmalloc(priv->bulk_in_size, GFP_KERNEL);\n            if (!priv->bulk_in_buffer)\n                goto error;\n        }\n        \n        if (usb_endpoint_is_bulk_out(endpoint)) {\n            priv->bulk_out_size = usb_endpoint_maxp(endpoint);\n            priv->bulk_out_endpointAddr = endpoint->bEndpointAddress;\n            priv->bulk_out_buffer = kmalloc(priv->bulk_out_size, GFP_KERNEL);\n            if (!priv->bulk_out_buffer)\n                goto error;\n        }\n    }\n    \n    if (!priv->bulk_in_endpointAddr || !priv->bulk_out_endpointAddr) {\n        dev_err(&interface->dev, \"找不到批量端点\\n\");\n        retval = -ENODEV;\n        goto error;\n    }\n    \n    \n    priv->read_urb = usb_alloc_urb(0, GFP_KERNEL);\n    if (!priv->read_urb)\n        goto error;\n    \n    priv->write_urb = usb_alloc_urb(0, GFP_KERNEL);\n    if (!priv->write_urb)\n        goto error;\n    \n    \n    usb_fill_bulk_urb(priv->write_urb, priv->udev,\n                     usb_sndbulkpipe(priv->udev, priv->bulk_out_endpointAddr),\n                     priv->bulk_out_buffer,\n                     priv->bulk_out_size,\n                     serial_write_bulk_callback, priv);\n    \n    \n    retval = kfifo_alloc(&priv->write_fifo, SERIAL_BUF_SIZE, GFP_KERNEL);\n    if (retval)\n        goto error;\n    \n    \n    usb_set_intfdata(interface, priv);\n    \n    \n    \n    \n    dev_info(&interface->dev, \"USB串口设备已连接\\n\");\n    \n    return 0;\n    \nerror:\n    if (priv) {\n        usb_free_urb(priv->read_urb);\n        usb_free_urb(priv->write_urb);\n        kfree(priv->bulk_in_buffer);\n        kfree(priv->bulk_out_buffer);\n        kfifo_free(&priv->write_fifo);\n        usb_put_dev(priv->udev);\n        kfree(priv);\n    }\n    return retval;\n}",
+      "calls": [
+        "kfree",
+        "usb_endpoint_is_bulk_out",
+        "usb_endpoint_is_bulk_in",
+        "usb_get_dev",
+        "kfifo_alloc",
+        "usb_free_urb",
+        "dev_info",
+        "kzalloc",
+        "usb_put_dev",
+        "kfifo_free",
+        "usb_sndbulkpipe",
+        "dev_err",
+        "usb_endpoint_maxp",
+        "mutex_init",
+        "usb_alloc_urb",
+        "interface_to_usbdev",
+        "usb_set_intfdata",
+        "spin_lock_init",
+        "kmalloc",
+        "usb_fill_bulk_urb"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "usb_driver.probe"
+    },
+    "usb_serial_disconnect": {
+      "name": "usb_serial_disconnect",
+      "return_type": "void",
+      "params": "struct usb_interface *interface",
+      "start_line": 358,
+      "end_line": 385,
+      "body": "{\n    struct usb_serial_private *priv = usb_get_intfdata(interface);\n    \n    if (!priv)\n        return;\n    \n    \n    usb_kill_urb(priv->read_urb);\n    usb_kill_urb(priv->write_urb);\n    cancel_work_sync(&priv->work);\n    \n    \n    usb_free_urb(priv->read_urb);\n    usb_free_urb(priv->write_urb);\n    kfree(priv->bulk_in_buffer);\n    kfree(priv->bulk_out_buffer);\n    kfifo_free(&priv->write_fifo);\n    usb_put_dev(priv->udev);\n    \n    usb_set_intfdata(interface, NULL);\n    kfree(priv);\n    \n    dev_info(&interface->dev, \"USB串口设备已断开\\n\");\n}",
+      "calls": [
+        "cancel_work_sync",
+        "kfree",
+        "usb_get_intfdata",
+        "usb_put_dev",
+        "usb_free_urb",
+        "kfifo_free",
+        "usb_set_intfdata",
+        "usb_kill_urb",
+        "dev_info"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "usb_driver.disconnect"
+    },
+    "usb_serial_init": {
+      "name": "usb_serial_init",
+      "return_type": "int __init",
+      "params": "void",
+      "start_line": 400,
+      "end_line": 441,
+      "body": "{\n    int retval;\n    \n    \n    serial_tty_driver = alloc_tty_driver(256);\n    if (!serial_tty_driver)\n        return -ENOMEM;\n    \n    \n    serial_tty_driver->driver_name = \"usb_serial\";\n    serial_tty_driver->name = \"ttyUSB\";\n    serial_tty_driver->major = 0;  \n    serial_tty_driver->minor_start = 0;\n    serial_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;\n    serial_tty_driver->subtype = SERIAL_TYPE_NORMAL;\n    serial_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;\n    serial_tty_driver->init_termios = tty_std_termios;\n    serial_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;\n    tty_set_operations(serial_tty_driver, &serial_ops);\n    \n    \n    retval = tty_register_driver(serial_tty_driver);\n    if (retval) {\n        put_tty_driver(serial_tty_driver);\n        return retval;\n    }\n    \n    \n    retval = usb_register(&usb_serial_driver);\n    if (retval) {\n        tty_unregister_driver(serial_tty_driver);\n        put_tty_driver(serial_tty_driver);\n        return retval;\n    }\n    \n    pr_info(\"USB串口驱动已加载\\n\");\n    return 0;\n}",
+      "calls": [
+        "usb_register",
+        "alloc_tty_driver",
+        "pr_info",
+        "put_tty_driver",
+        "tty_register_driver",
+        "tty_unregister_driver",
+        "tty_set_operations"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "module_init"
+    },
+    "usb_serial_exit": {
+      "name": "usb_serial_exit",
+      "return_type": "void __exit",
+      "params": "void",
+      "start_line": 441,
+      "end_line": 454,
+      "body": "{\n    \n    usb_deregister(&usb_serial_driver);\n    \n    \n    tty_unregister_driver(serial_tty_driver);\n    put_tty_driver(serial_tty_driver);\n    \n    pr_info(\"USB串口驱动已卸载\\n\");\n}",
+      "calls": [
+        "put_tty_driver",
+        "tty_unregister_driver",
+        "pr_info",
+        "usb_deregister"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "module_exit"
+    }
+  },
+  "struct_ops": [
+    {
+      "struct_type": "tty_operations",
+      "var_name": "serial_ops",
+      "mappings": {
+        "open": "serial_open",
+        "close": "serial_close",
+        "write": "serial_write",
+        "write_room": "serial_write_room"
+      },
+      "line": 258
+    },
+    {
+      "struct_type": "usb_driver",
+      "var_name": "usb_serial_driver",
+      "mappings": {
+        "probe": "usb_serial_probe",
+        "disconnect": "usb_serial_disconnect",
+        "id_table": "usb_serial_id_table"
+      },
+      "line": 395
+    }
+  ],
+  "async_handlers": [
+    {
+      "handler_type": "work",
+      "func_name": "serial_send_work",
+      "init_pattern": "INIT_WORK(&priv->work, serial_send_work)",
+      "trigger_pattern": "schedule_work|queue_work",
+      "line": 286,
+      "context": "进程上下文，可睡眠",
+      "extra_info": {
+        "var_name": "priv->work",
+        "icon": "⚙️",
+        "desc": "工作队列"
+      }
+    }
+  ],
+  "call_tree": [
+    {
+      "name": "serial_send_work",
+      "display_name": "⚙️ [工作队列] → serial_send_work()",
+      "line": 107,
+      "type": "entry_point",
+      "description": "schedule_work|queue_work",
+      "time_info": "进程上下文，可睡眠",
+      "children": [
+        {
+          "name": "usb_submit_urb",
+          "display_name": "usb_submit_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_unlock_irqrestore",
+          "display_name": "spin_unlock_irqrestore()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kfifo_out",
+          "display_name": "kfifo_out()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "dev_err",
+          "display_name": "dev_err()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_lock_irqsave",
+          "display_name": "spin_lock_irqsave()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "serial_open",
+      "display_name": "📌 [tty_operations.open] → serial_open()",
+      "line": 146,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "usb_submit_urb",
+          "display_name": "usb_submit_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "dev_err",
+          "display_name": "dev_err()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_rcvbulkpipe",
+          "display_name": "usb_rcvbulkpipe()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mutex_lock",
+          "display_name": "mutex_lock()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mutex_unlock",
+          "display_name": "mutex_unlock()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_fill_bulk_urb",
+          "display_name": "usb_fill_bulk_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "serial_close",
+      "display_name": "📌 [tty_operations.close] → serial_close()",
+      "line": 187,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "usb_kill_urb",
+          "display_name": "usb_kill_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mutex_lock",
+          "display_name": "mutex_lock()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mutex_unlock",
+          "display_name": "mutex_unlock()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "cancel_work_sync",
+          "display_name": "cancel_work_sync()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "serial_write",
+      "display_name": "📌 [tty_operations.write] → serial_write()",
+      "line": 214,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "schedule_work",
+          "display_name": "schedule_work()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kfifo_in",
+          "display_name": "kfifo_in()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_lock_irqsave",
+          "display_name": "spin_lock_irqsave()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_unlock_irqrestore",
+          "display_name": "spin_unlock_irqrestore()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "serial_write_room",
+      "display_name": "📌 [tty_operations.write_room] → serial_write_room()",
+      "line": 238,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "kfifo_avail",
+          "display_name": "kfifo_avail()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_unlock_irqrestore",
+          "display_name": "spin_unlock_irqrestore()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_lock_irqsave",
+          "display_name": "spin_lock_irqsave()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "usb_serial_probe",
+      "display_name": "📌 [usb_driver.probe] → usb_serial_probe()",
+      "line": 263,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "kfree",
+          "display_name": "kfree()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_endpoint_is_bulk_out",
+          "display_name": "usb_endpoint_is_bulk_out()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_endpoint_is_bulk_in",
+          "display_name": "usb_endpoint_is_bulk_in()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_get_dev",
+          "display_name": "usb_get_dev()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kfifo_alloc",
+          "display_name": "kfifo_alloc()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_free_urb",
+          "display_name": "usb_free_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "dev_info",
+          "display_name": "dev_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kzalloc",
+          "display_name": "kzalloc()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_put_dev",
+          "display_name": "usb_put_dev()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kfifo_free",
+          "display_name": "kfifo_free()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_sndbulkpipe",
+          "display_name": "usb_sndbulkpipe()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "dev_err",
+          "display_name": "dev_err()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_endpoint_maxp",
+          "display_name": "usb_endpoint_maxp()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mutex_init",
+          "display_name": "mutex_init()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_alloc_urb",
+          "display_name": "usb_alloc_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "interface_to_usbdev",
+          "display_name": "interface_to_usbdev()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_set_intfdata",
+          "display_name": "usb_set_intfdata()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_lock_init",
+          "display_name": "spin_lock_init()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kmalloc",
+          "display_name": "kmalloc()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_fill_bulk_urb",
+          "display_name": "usb_fill_bulk_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "usb_serial_disconnect",
+      "display_name": "📌 [usb_driver.disconnect] → usb_serial_disconnect()",
+      "line": 358,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "cancel_work_sync",
+          "display_name": "cancel_work_sync()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kfree",
+          "display_name": "kfree()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_get_intfdata",
+          "display_name": "usb_get_intfdata()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_put_dev",
+          "display_name": "usb_put_dev()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_free_urb",
+          "display_name": "usb_free_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kfifo_free",
+          "display_name": "kfifo_free()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_set_intfdata",
+          "display_name": "usb_set_intfdata()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_kill_urb",
+          "display_name": "usb_kill_urb()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "dev_info",
+          "display_name": "dev_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "usb_serial_init",
+      "display_name": "🚀 [模块加载] → usb_serial_init()",
+      "line": 400,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "usb_register",
+          "display_name": "usb_register()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "alloc_tty_driver",
+          "display_name": "alloc_tty_driver()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "put_tty_driver",
+          "display_name": "put_tty_driver()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "tty_register_driver",
+          "display_name": "tty_register_driver()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "tty_unregister_driver",
+          "display_name": "tty_unregister_driver()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "tty_set_operations",
+          "display_name": "tty_set_operations()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "usb_serial_exit",
+      "display_name": "🛑 [模块卸载] → usb_serial_exit()",
+      "line": 441,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "put_tty_driver",
+          "display_name": "put_tty_driver()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "tty_unregister_driver",
+          "display_name": "tty_unregister_driver()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "usb_deregister",
+          "display_name": "usb_deregister()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_functions": 11,
+    "callbacks": 9,
+    "struct_ops_count": 2,
+    "struct_types": [
+      "tty_operations",
+      "usb_driver"
+    ],
+    "async_handlers_count": 1,
+    "async_handlers_by_type": {
+      "work": [
+        {
+          "func": "serial_send_work",
+          "context": "进程上下文，可睡眠",
+          "line": 286
+        }
+      ]
+    },
+    "unused_functions": [
+      "serial_read_bulk_callback",
+      "serial_write_bulk_callback"
+    ],
+    "most_complex": [
+      [
+        "usb_serial_probe",
+        20
+      ],
+      [
+        "usb_serial_disconnect",
+        9
+      ],
+      [
+        "usb_serial_init",
+        7
+      ],
+      [
+        "serial_open",
+        6
+      ],
+      [
+        "serial_send_work",
+        5
+      ]
+    ]
+  }
+}

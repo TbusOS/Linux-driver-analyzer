@@ -1,0 +1,1069 @@
+{
+  "file": "examples/async_demo/async_demo_example.c",
+  "functions": {
+    "demo_work_handler": {
+      "name": "demo_work_handler",
+      "return_type": "void",
+      "params": "struct work_struct *work",
+      "start_line": 43,
+      "end_line": 60,
+      "body": "{\n    struct async_demo_dev *dev = container_of(work, struct async_demo_dev, work);\n    \n    pr_info(\"[工作队列] 开始处理 (进程上下文，可睡眠)\\n\");\n    \n    \n    msleep(100);\n    \n    \n    mutex_lock(&dev->pdev->dev.mutex);\n    pr_info(\"[工作队列] 处理完成\\n\");\n    mutex_unlock(&dev->pdev->dev.mutex);\n}",
+      "calls": [
+        "开始处理",
+        "pr_info",
+        "msleep",
+        "mutex_unlock",
+        "mutex_lock"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "async_work"
+    },
+    "demo_delayed_work_handler": {
+      "name": "demo_delayed_work_handler",
+      "return_type": "void",
+      "params": "struct work_struct *work",
+      "start_line": 60,
+      "end_line": 72,
+      "body": "{\n    struct delayed_work *dwork = to_delayed_work(work);\n    struct async_demo_dev *dev = container_of(dwork, struct async_demo_dev, delayed_work);\n    \n    pr_info(\"[延迟工作队列] 延迟后开始处理\\n\");\n    \n    \n    if (atomic_read(&dev->running))\n        schedule_delayed_work(&dev->delayed_work, msecs_to_jiffies(1000));\n}",
+      "calls": [
+        "msecs_to_jiffies",
+        "atomic_read",
+        "pr_info",
+        "to_delayed_work",
+        "schedule_delayed_work"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "async_delayed_work"
+    },
+    "demo_tasklet_handler": {
+      "name": "demo_tasklet_handler",
+      "return_type": "void",
+      "params": "unsigned long data",
+      "start_line": 72,
+      "end_line": 90,
+      "body": "{\n    struct async_demo_dev *dev = (struct async_demo_dev *)data;\n    unsigned long flags;\n    \n    pr_info(\"[Tasklet] 软中断上下文处理 (不可睡眠)\\n\");\n    \n    \n    spin_lock_irqsave(&dev->lock, flags);\n    \n    spin_unlock_irqrestore(&dev->lock, flags);\n    \n    \n    schedule_work(&dev->work);\n}",
+      "calls": [
+        "spin_unlock_irqrestore",
+        "pr_info",
+        "软中断上下文处理",
+        "schedule_work",
+        "spin_lock_irqsave"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "async_tasklet"
+    },
+    "demo_timer_callback": {
+      "name": "demo_timer_callback",
+      "return_type": "void",
+      "params": "struct timer_list *t",
+      "start_line": 90,
+      "end_line": 106,
+      "body": "{\n    struct async_demo_dev *dev = from_timer(dev, t, timer);\n    \n    pr_info(\"[定时器] 到期回调 (软中断上下文)\\n\");\n    \n    \n    tasklet_schedule(&dev->tasklet);\n    \n    \n    if (atomic_read(&dev->running))\n        mod_timer(&dev->timer, jiffies + msecs_to_jiffies(500));\n}",
+      "calls": [
+        "tasklet_schedule",
+        "from_timer",
+        "msecs_to_jiffies",
+        "atomic_read",
+        "pr_info",
+        "到期回调",
+        "mod_timer"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "async_timer"
+    },
+    "demo_hrtimer_callback": {
+      "name": "demo_hrtimer_callback",
+      "return_type": "enum hrtimer_restart",
+      "params": "struct hrtimer *timer",
+      "start_line": 106,
+      "end_line": 121,
+      "body": "{\n    struct async_demo_dev *dev = container_of(timer, struct async_demo_dev, hrtimer);\n    \n    pr_info(\"[高精度定时器] 纳秒级精度回调 (硬中断上下文)\\n\");\n    \n    \n    if (atomic_read(&dev->running)) {\n        hrtimer_forward_now(timer, ms_to_ktime(100));\n        return HRTIMER_RESTART;\n    }\n    \n    return HRTIMER_NORESTART;\n}",
+      "calls": [
+        "atomic_read",
+        "pr_info",
+        "纳秒级精度回调",
+        "hrtimer_forward_now",
+        "ms_to_ktime"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "async_hrtimer_assign"
+    },
+    "demo_irq_handler": {
+      "name": "demo_irq_handler",
+      "return_type": "irqreturn_t",
+      "params": "int irq, void *dev_id",
+      "start_line": 121,
+      "end_line": 136,
+      "body": "{\n    struct async_demo_dev *dev = dev_id;\n    \n    pr_info(\"[硬中断] 快速处理上半部\\n\");\n    \n    \n    \n    tasklet_schedule(&dev->tasklet);\n    \n    return IRQ_HANDLED;\n}",
+      "calls": [
+        "tasklet_schedule",
+        "pr_info"
+      ],
+      "called_by": [],
+      "is_callback": false,
+      "callback_context": ""
+    },
+    "demo_irq_thread_handler": {
+      "name": "demo_irq_thread_handler",
+      "return_type": "irqreturn_t",
+      "params": "int irq, void *dev_id",
+      "start_line": 136,
+      "end_line": 148,
+      "body": "{\n    struct async_demo_dev *dev = dev_id;\n    \n    pr_info(\"[线程化中断] 进程上下文处理下半部 (可睡眠)\\n\");\n    \n    \n    msleep(10);\n    \n    return IRQ_HANDLED;\n}",
+      "calls": [
+        "进程上下文处理下半部",
+        "msleep",
+        "pr_info"
+      ],
+      "called_by": [],
+      "is_callback": false,
+      "callback_context": ""
+    },
+    "demo_kthread_func": {
+      "name": "demo_kthread_func",
+      "return_type": "int",
+      "params": "void *data",
+      "start_line": 148,
+      "end_line": 173,
+      "body": "{\n    struct async_demo_dev *dev = data;\n    \n    pr_info(\"[内核线程] 启动\\n\");\n    \n    while (!kthread_should_stop()) {\n        pr_info(\"[内核线程] 周期性工作\\n\");\n        \n        \n        msleep_interruptible(2000);\n        \n        \n        if (kthread_should_stop())\n            break;\n    }\n    \n    pr_info(\"[内核线程] 退出\\n\");\n    complete(&dev->thread_done);\n    \n    return 0;\n}",
+      "calls": [
+        "kthread_should_stop",
+        "complete",
+        "pr_info",
+        "msleep_interruptible"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "async_kthread"
+    },
+    "async_demo_probe": {
+      "name": "async_demo_probe",
+      "return_type": "int",
+      "params": "struct platform_device *pdev",
+      "start_line": 173,
+      "end_line": 239,
+      "body": "{\n    struct async_demo_dev *dev;\n    int ret;\n    \n    pr_info(\"async_demo: 设备探测\\n\");\n    \n    dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);\n    if (!dev)\n        return -ENOMEM;\n    \n    demo_dev = dev;\n    dev->pdev = pdev;\n    platform_set_drvdata(pdev, dev);\n    \n    \n    spin_lock_init(&dev->lock);\n    atomic_set(&dev->running, 1);\n    \n    \n    INIT_WORK(&dev->work, demo_work_handler);\n    INIT_DELAYED_WORK(&dev->delayed_work, demo_delayed_work_handler);\n    \n    \n    tasklet_init(&dev->tasklet, demo_tasklet_handler, (unsigned long)dev);\n    \n    \n    timer_setup(&dev->timer, demo_timer_callback, 0);\n    \n    \n    hrtimer_init(&dev->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);\n    dev->hrtimer.function = demo_hrtimer_callback;\n    \n    \n    init_completion(&dev->thread_done);\n    \n    \n    \n    \n    \n    dev->kthread = kthread_run(demo_kthread_func, dev, \"async_demo_thread\");\n    if (IS_ERR(dev->kthread)) {\n        ret = PTR_ERR(dev->kthread);\n        goto err_irq;\n    }\n    \n    \n    mod_timer(&dev->timer, jiffies + msecs_to_jiffies(500));\n    \n    \n    hrtimer_start(&dev->hrtimer, ms_to_ktime(100), HRTIMER_MODE_REL);\n    \n    \n    schedule_delayed_work(&dev->delayed_work, msecs_to_jiffies(1000));\n    \n    pr_info(\"async_demo: 所有异步机制已初始化\\n\");\n    \n    return 0;\n\nerr_irq:\n    \n    return ret;\n}",
+      "calls": [
+        "INIT_DELAYED_WORK",
+        "msecs_to_jiffies",
+        "hrtimer_init",
+        "pr_info",
+        "devm_kzalloc",
+        "IS_ERR",
+        "schedule_delayed_work",
+        "PTR_ERR",
+        "hrtimer_start",
+        "atomic_set",
+        "kthread_run",
+        "ms_to_ktime",
+        "platform_set_drvdata",
+        "init_completion",
+        "tasklet_init",
+        "spin_lock_init",
+        "mod_timer",
+        "timer_setup"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "platform_driver.probe"
+    },
+    "async_demo_remove": {
+      "name": "async_demo_remove",
+      "return_type": "int",
+      "params": "struct platform_device *pdev",
+      "start_line": 239,
+      "end_line": 275,
+      "body": "{\n    struct async_demo_dev *dev = platform_get_drvdata(pdev);\n    \n    pr_info(\"async_demo: 设备移除\\n\");\n    \n    \n    atomic_set(&dev->running, 0);\n    \n    \n    if (dev->kthread) {\n        kthread_stop(dev->kthread);\n        wait_for_completion(&dev->thread_done);\n    }\n    \n    \n    hrtimer_cancel(&dev->hrtimer);\n    \n    \n    del_timer_sync(&dev->timer);\n    \n    \n    tasklet_kill(&dev->tasklet);\n    \n    \n    cancel_work_sync(&dev->work);\n    cancel_delayed_work_sync(&dev->delayed_work);\n    \n    \n    \n    \n    pr_info(\"async_demo: 清理完成\\n\");\n    \n    return 0;\n}",
+      "calls": [
+        "hrtimer_cancel",
+        "cancel_work_sync",
+        "kthread_stop",
+        "pr_info",
+        "platform_get_drvdata",
+        "del_timer_sync",
+        "tasklet_kill",
+        "cancel_delayed_work_sync",
+        "wait_for_completion",
+        "atomic_set"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "platform_driver.remove"
+    },
+    "async_demo_init": {
+      "name": "async_demo_init",
+      "return_type": "int __init",
+      "params": "void",
+      "start_line": 284,
+      "end_line": 291,
+      "body": "{\n    pr_info(\"async_demo: 模块加载\\n\");\n    return platform_driver_register(&async_demo_driver);\n}",
+      "calls": [
+        "platform_driver_register",
+        "pr_info"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "module_init"
+    },
+    "async_demo_exit": {
+      "name": "async_demo_exit",
+      "return_type": "void __exit",
+      "params": "void",
+      "start_line": 291,
+      "end_line": 298,
+      "body": "{\n    platform_driver_unregister(&async_demo_driver);\n    pr_info(\"async_demo: 模块卸载\\n\");\n}",
+      "calls": [
+        "pr_info",
+        "platform_driver_unregister"
+      ],
+      "called_by": [],
+      "is_callback": true,
+      "callback_context": "module_exit"
+    }
+  },
+  "struct_ops": [
+    {
+      "struct_type": "platform_driver",
+      "var_name": "async_demo_driver",
+      "mappings": {
+        "probe": "async_demo_probe",
+        "remove": "async_demo_remove",
+        "name": "DRIVER_NAME"
+      },
+      "line": 278
+    }
+  ],
+  "async_handlers": [
+    {
+      "handler_type": "work",
+      "func_name": "demo_work_handler",
+      "init_pattern": "INIT_WORK(&dev->work, demo_work_handler)",
+      "trigger_pattern": "schedule_work|queue_work",
+      "line": 197,
+      "context": "进程上下文，可睡眠",
+      "extra_info": {
+        "var_name": "dev->work",
+        "icon": "⚙️",
+        "desc": "工作队列"
+      }
+    },
+    {
+      "handler_type": "delayed_work",
+      "func_name": "demo_delayed_work_handler",
+      "init_pattern": "INIT_DELAYED_WORK(&dev->delayed_work, demo_delayed_work_handler)",
+      "trigger_pattern": "schedule_delayed_work|queue_delayed_work",
+      "line": 198,
+      "context": "进程上下文，可睡眠",
+      "extra_info": {
+        "var_name": "dev->delayed_work",
+        "icon": "⏰",
+        "desc": "延迟工作队列"
+      }
+    },
+    {
+      "handler_type": "tasklet",
+      "func_name": "demo_tasklet_handler",
+      "init_pattern": "tasklet_init(&dev->tasklet, demo_tasklet_handler,",
+      "trigger_pattern": "tasklet_schedule|tasklet_hi_schedule",
+      "line": 201,
+      "context": "软中断上下文，不可睡眠",
+      "extra_info": {
+        "var_name": "dev->tasklet",
+        "icon": "🔄",
+        "desc": "Tasklet软中断"
+      }
+    },
+    {
+      "handler_type": "timer",
+      "func_name": "demo_timer_callback",
+      "init_pattern": "timer_setup(&dev->timer, demo_timer_callback,",
+      "trigger_pattern": "mod_timer|add_timer",
+      "line": 204,
+      "context": "软中断上下文，不可睡眠",
+      "extra_info": {
+        "var_name": "dev->timer",
+        "icon": "⏲️",
+        "desc": "内核定时器"
+      }
+    },
+    {
+      "handler_type": "kthread",
+      "func_name": "demo_kthread_func",
+      "init_pattern": "kthread_run(demo_kthread_func,",
+      "trigger_pattern": "wake_up_process 或创建时自动启动",
+      "line": 217,
+      "context": "进程上下文，可睡眠",
+      "extra_info": {
+        "var_name": null,
+        "icon": "🧵",
+        "desc": "内核线程"
+      }
+    },
+    {
+      "handler_type": "hrtimer_assign",
+      "func_name": "demo_hrtimer_callback",
+      "init_pattern": "dev->hrtimer.function = demo_hrtimer_callback",
+      "trigger_pattern": "hrtimer_start/hrtimer_restart",
+      "line": 208,
+      "context": "硬中断上下文",
+      "extra_info": {
+        "var_name": "dev->hrtimer",
+        "icon": "⏱️",
+        "desc": "高精度定时器"
+      }
+    }
+  ],
+  "call_tree": [
+    {
+      "name": "demo_work_handler",
+      "display_name": "⚙️ [工作队列] → demo_work_handler()",
+      "line": 43,
+      "type": "entry_point",
+      "description": "schedule_work|queue_work",
+      "time_info": "进程上下文，可睡眠",
+      "children": [
+        {
+          "name": "开始处理",
+          "display_name": "开始处理()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "msleep",
+          "display_name": "msleep()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mutex_unlock",
+          "display_name": "mutex_unlock()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mutex_lock",
+          "display_name": "mutex_lock()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "demo_delayed_work_handler",
+      "display_name": "⏰ [延迟工作队列] → demo_delayed_work_handler()",
+      "line": 60,
+      "type": "entry_point",
+      "description": "schedule_delayed_work|queue_delayed_work",
+      "time_info": "进程上下文，可睡眠",
+      "children": [
+        {
+          "name": "msecs_to_jiffies",
+          "display_name": "msecs_to_jiffies()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "atomic_read",
+          "display_name": "atomic_read()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "to_delayed_work",
+          "display_name": "to_delayed_work()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "schedule_delayed_work",
+          "display_name": "schedule_delayed_work()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "demo_tasklet_handler",
+      "display_name": "🔄 [Tasklet软中断] → demo_tasklet_handler()",
+      "line": 72,
+      "type": "entry_point",
+      "description": "tasklet_schedule|tasklet_hi_schedule",
+      "time_info": "软中断上下文，不可睡眠",
+      "children": [
+        {
+          "name": "spin_unlock_irqrestore",
+          "display_name": "spin_unlock_irqrestore()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "软中断上下文处理",
+          "display_name": "软中断上下文处理()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "schedule_work",
+          "display_name": "schedule_work()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_lock_irqsave",
+          "display_name": "spin_lock_irqsave()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "demo_timer_callback",
+      "display_name": "⏲️ [内核定时器] → demo_timer_callback()",
+      "line": 90,
+      "type": "entry_point",
+      "description": "mod_timer|add_timer",
+      "time_info": "软中断上下文，不可睡眠",
+      "children": [
+        {
+          "name": "tasklet_schedule",
+          "display_name": "tasklet_schedule()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "from_timer",
+          "display_name": "from_timer()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "msecs_to_jiffies",
+          "display_name": "msecs_to_jiffies()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "atomic_read",
+          "display_name": "atomic_read()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "到期回调",
+          "display_name": "到期回调()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mod_timer",
+          "display_name": "mod_timer()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "demo_hrtimer_callback",
+      "display_name": "⏱️ [高精度定时器] → demo_hrtimer_callback()",
+      "line": 106,
+      "type": "entry_point",
+      "description": "hrtimer_start/hrtimer_restart",
+      "time_info": "硬中断上下文",
+      "children": [
+        {
+          "name": "atomic_read",
+          "display_name": "atomic_read()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "纳秒级精度回调",
+          "display_name": "纳秒级精度回调()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "hrtimer_forward_now",
+          "display_name": "hrtimer_forward_now()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "ms_to_ktime",
+          "display_name": "ms_to_ktime()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "demo_kthread_func",
+      "display_name": "🧵 [内核线程] → demo_kthread_func()",
+      "line": 148,
+      "type": "entry_point",
+      "description": "wake_up_process 或创建时自动启动",
+      "time_info": "进程上下文，可睡眠",
+      "children": [
+        {
+          "name": "kthread_should_stop",
+          "display_name": "kthread_should_stop()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "complete",
+          "display_name": "complete()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "msleep_interruptible",
+          "display_name": "msleep_interruptible()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "async_demo_probe",
+      "display_name": "📌 [platform_driver.probe] → async_demo_probe()",
+      "line": 173,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "INIT_DELAYED_WORK",
+          "display_name": "INIT_DELAYED_WORK()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "msecs_to_jiffies",
+          "display_name": "msecs_to_jiffies()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "hrtimer_init",
+          "display_name": "hrtimer_init()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "devm_kzalloc",
+          "display_name": "devm_kzalloc()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "IS_ERR",
+          "display_name": "IS_ERR()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "schedule_delayed_work",
+          "display_name": "schedule_delayed_work()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "PTR_ERR",
+          "display_name": "PTR_ERR()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "hrtimer_start",
+          "display_name": "hrtimer_start()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "atomic_set",
+          "display_name": "atomic_set()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kthread_run",
+          "display_name": "kthread_run()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "ms_to_ktime",
+          "display_name": "ms_to_ktime()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "platform_set_drvdata",
+          "display_name": "platform_set_drvdata()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "init_completion",
+          "display_name": "init_completion()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "tasklet_init",
+          "display_name": "tasklet_init()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "spin_lock_init",
+          "display_name": "spin_lock_init()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "mod_timer",
+          "display_name": "mod_timer()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "timer_setup",
+          "display_name": "timer_setup()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "async_demo_remove",
+      "display_name": "📌 [platform_driver.remove] → async_demo_remove()",
+      "line": 239,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "hrtimer_cancel",
+          "display_name": "hrtimer_cancel()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "cancel_work_sync",
+          "display_name": "cancel_work_sync()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "kthread_stop",
+          "display_name": "kthread_stop()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "platform_get_drvdata",
+          "display_name": "platform_get_drvdata()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "del_timer_sync",
+          "display_name": "del_timer_sync()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "tasklet_kill",
+          "display_name": "tasklet_kill()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "cancel_delayed_work_sync",
+          "display_name": "cancel_delayed_work_sync()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "wait_for_completion",
+          "display_name": "wait_for_completion()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "atomic_set",
+          "display_name": "atomic_set()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "async_demo_init",
+      "display_name": "🚀 [模块加载] → async_demo_init()",
+      "line": 284,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "platform_driver_register",
+          "display_name": "platform_driver_register()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "async_demo_exit",
+      "display_name": "🛑 [模块卸载] → async_demo_exit()",
+      "line": 291,
+      "type": "entry_point",
+      "description": "",
+      "time_info": "",
+      "children": [
+        {
+          "name": "pr_info",
+          "display_name": "pr_info()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        },
+        {
+          "name": "platform_driver_unregister",
+          "display_name": "platform_driver_unregister()",
+          "line": 0,
+          "type": "kernel_api",
+          "description": "",
+          "time_info": "",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_functions": 12,
+    "callbacks": 10,
+    "struct_ops_count": 1,
+    "struct_types": [
+      "platform_driver"
+    ],
+    "async_handlers_count": 6,
+    "async_handlers_by_type": {
+      "work": [
+        {
+          "func": "demo_work_handler",
+          "context": "进程上下文，可睡眠",
+          "line": 197
+        }
+      ],
+      "delayed_work": [
+        {
+          "func": "demo_delayed_work_handler",
+          "context": "进程上下文，可睡眠",
+          "line": 198
+        }
+      ],
+      "tasklet": [
+        {
+          "func": "demo_tasklet_handler",
+          "context": "软中断上下文，不可睡眠",
+          "line": 201
+        }
+      ],
+      "timer": [
+        {
+          "func": "demo_timer_callback",
+          "context": "软中断上下文，不可睡眠",
+          "line": 204
+        }
+      ],
+      "kthread": [
+        {
+          "func": "demo_kthread_func",
+          "context": "进程上下文，可睡眠",
+          "line": 217
+        }
+      ],
+      "hrtimer_assign": [
+        {
+          "func": "demo_hrtimer_callback",
+          "context": "硬中断上下文",
+          "line": 208
+        }
+      ]
+    },
+    "unused_functions": [
+      "demo_irq_handler",
+      "demo_irq_thread_handler"
+    ],
+    "most_complex": [
+      [
+        "async_demo_probe",
+        18
+      ],
+      [
+        "async_demo_remove",
+        10
+      ],
+      [
+        "demo_timer_callback",
+        7
+      ],
+      [
+        "demo_work_handler",
+        5
+      ],
+      [
+        "demo_delayed_work_handler",
+        5
+      ]
+    ]
+  }
+}

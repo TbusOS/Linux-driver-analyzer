@@ -61,14 +61,10 @@ pip-delete-this-directory.txt
 # Jupyter
 .ipynb_checkpoints
 
-# Project specific
+# Project specific - 忽略临时生成的json，但保留示例和知识库
 *.json
 !src/core/knowledge_base.json
-!examples/*.json
-
-# Analysis results
-*_result.json
-*_analysis.json
+!examples/**/*.json
 
 # OS
 .DS_Store
