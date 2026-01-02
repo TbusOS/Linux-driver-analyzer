@@ -853,7 +853,7 @@
             const container = document.getElementById('call-graph');
             const functions = analysisData.functions || {};
             
-            // 获取入口点函数
+            // 获取入口点函数（按类型分组）
             const entryFuncs = Object.values(functions).filter(f => f.is_callback);
             
             if (entryFuncs.length === 0) {
@@ -861,57 +861,142 @@
                 return;
             }
             
-            // 简化的调用图
-            let y = 50;
-            const nodeHeight = 35;
-            const levelGap = 200;
+            // 构建多层调用树
+            const maxDepth = 4; // 最大展开深度
+            const visited = new Set();
             
-            let svgContent = '<svg viewBox="0 0 800 ' + (entryFuncs.length * 120 + 100) + '">';
-            svgContent += `
-                <defs>
-                    <marker id="call-arrow" viewBox="0 0 10 10" refX="9" refY="5"
-                            markerWidth="6" markerHeight="6" orient="auto">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-yellow)" />
-                    </marker>
-                </defs>
-            `;
-            
-            entryFuncs.forEach(func => {
-                const calls = (func.calls || []).slice(0, 5); // 限制显示5个调用
+            function buildCallTree(funcName, depth = 0) {
+                if (depth >= maxDepth || visited.has(funcName + depth)) return null;
+                visited.add(funcName + depth);
                 
-                // 入口函数节点
-                svgContent += `
-                    <g class="call-node entry" transform="translate(50, ${y})">
-                        <rect width="180" height="${nodeHeight}" rx="4" ry="4" />
-                        <text x="90" y="22" text-anchor="middle" fill="var(--accent-green)" font-size="13">${func.name}()</text>
-                    </g>
+                const func = functions[funcName];
+                const calls = func ? (func.calls || []).filter(c => 
+                    // 过滤掉无意义的调用
+                    !c.includes('(') && c.length > 2 && 
+                    !['pr_info', 'pr_err', 'pr_debug', 'printk', 'BUG_ON', 'WARN_ON'].includes(c)
+                ).slice(0, 6) : [];
+                
+                return {
+                    name: funcName,
+                    isKernel: !func,
+                    isCallback: func?.is_callback,
+                    context: func?.callback_context,
+                    children: calls.map(c => buildCallTree(c, depth + 1)).filter(Boolean)
+                };
+            }
+            
+            // 构建完整调用树
+            const trees = entryFuncs.map(f => buildCallTree(f.name));
+            
+            // 渲染为可折叠的树形结构
+            let html = '<div class="call-tree-container">';
+            
+            function renderNode(node, depth = 0) {
+                if (!node) return '';
+                
+                const indent = depth * 24;
+                const hasChildren = node.children && node.children.length > 0;
+                const nodeClass = node.isCallback ? 'entry' : (node.isKernel ? 'kernel' : 'user');
+                const icon = node.isCallback ? '🚀' : (node.isKernel ? '📦' : '📄');
+                const contextBadge = node.context ? `<span class="context-badge">${node.context}</span>` : '';
+                
+                let result = `
+                    <div class="call-tree-node ${nodeClass}" style="padding-left: ${indent}px">
+                        <span class="node-toggle">${hasChildren ? '▶' : '·'}</span>
+                        <span class="node-icon">${icon}</span>
+                        <span class="node-name">${node.name}()</span>
+                        ${contextBadge}
+                    </div>
                 `;
                 
-                // 调用的函数
-                calls.forEach((call, i) => {
-                    const callY = y + (i - calls.length/2 + 0.5) * 30;
-                    const isKernel = !functions[call];
-                    
-                    // 连线
-                    svgContent += `<line class="link" x1="230" y1="${y + nodeHeight/2}" 
-                                         x2="350" y2="${callY + 15}" 
-                                         stroke="var(--accent-yellow)" marker-end="url(#call-arrow)" />`;
-                    
-                    // 被调用函数节点
-                    const textColor = isKernel ? 'var(--accent-blue)' : 'var(--accent-yellow)';
-                    svgContent += `
-                        <g class="call-node ${isKernel ? 'kernel' : ''}" transform="translate(360, ${callY})">
-                            <rect width="160" height="30" rx="3" ry="3" />
-                            <text x="80" y="20" text-anchor="middle" fill="${textColor}" font-size="12">${call}()</text>
-                        </g>
-                    `;
-                });
+                if (hasChildren) {
+                    result += `<div class="call-tree-children collapsed">`;
+                    node.children.forEach(child => {
+                        result += renderNode(child, depth + 1);
+                    });
+                    result += `</div>`;
+                }
                 
-                y += Math.max(calls.length * 30, 60) + 40;
+                return result;
+            }
+            
+            // 分类渲染
+            const categories = {
+                'module_init': { title: '📦 模块加载', funcs: [] },
+                'module_exit': { title: '📤 模块卸载', funcs: [] },
+                'probe': { title: '🔌 设备探测', funcs: [] },
+                'remove': { title: '⏏️ 设备移除', funcs: [] },
+                'async': { title: '⚡ 异步处理', funcs: [] },
+                'other': { title: '🔧 其他回调', funcs: [] }
+            };
+            
+            trees.forEach(tree => {
+                if (!tree) return;
+                const ctx = tree.context || '';
+                if (ctx.includes('init')) categories['module_init'].funcs.push(tree);
+                else if (ctx.includes('exit')) categories['module_exit'].funcs.push(tree);
+                else if (ctx.includes('probe')) categories['probe'].funcs.push(tree);
+                else if (ctx.includes('remove')) categories['remove'].funcs.push(tree);
+                else if (ctx.includes('async') || ctx.includes('work') || ctx.includes('timer') || 
+                         ctx.includes('tasklet') || ctx.includes('kthread') || ctx.includes('hrtimer'))
+                    categories['async'].funcs.push(tree);
+                else categories['other'].funcs.push(tree);
             });
             
-            svgContent += '</svg>';
-            container.innerHTML = svgContent;
+            Object.entries(categories).forEach(([key, cat]) => {
+                if (cat.funcs.length === 0) return;
+                html += `<div class="call-tree-category">
+                    <div class="category-header">${cat.title}</div>`;
+                cat.funcs.forEach(tree => {
+                    html += renderNode(tree);
+                });
+                html += `</div>`;
+            });
+            
+            html += `</div>
+                <style>
+                    .call-tree-container { padding: 16px; font-family: var(--font-mono); font-size: 13px; }
+                    .call-tree-category { margin-bottom: 20px; }
+                    .category-header { font-size: 14px; font-weight: 600; color: var(--text-bright); 
+                                       margin-bottom: 8px; padding: 8px 12px; background: var(--bg-tertiary); 
+                                       border-radius: 6px; }
+                    .call-tree-node { display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+                                      border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+                    .call-tree-node:hover { background: var(--bg-hover); }
+                    .node-toggle { width: 12px; color: var(--text-secondary); font-size: 10px; }
+                    .node-icon { font-size: 12px; }
+                    .node-name { font-weight: 500; }
+                    .call-tree-node.entry .node-name { color: var(--accent-green); }
+                    .call-tree-node.kernel .node-name { color: var(--accent-blue); }
+                    .call-tree-node.user .node-name { color: var(--accent-yellow); }
+                    .context-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px;
+                                     background: var(--bg-tertiary); color: var(--text-secondary); margin-left: 8px; }
+                    .call-tree-children { margin-left: 12px; border-left: 1px dashed var(--border-color); }
+                    .call-tree-children.collapsed { display: none; }
+                    .call-tree-children.expanded { display: block; }
+                </style>
+            `;
+            
+            container.innerHTML = html;
+            
+            // 添加折叠/展开事件
+            container.querySelectorAll('.call-tree-node').forEach(node => {
+                node.addEventListener('click', function(e) {
+                    const children = this.nextElementSibling;
+                    if (children && children.classList.contains('call-tree-children')) {
+                        const toggle = this.querySelector('.node-toggle');
+                        if (children.classList.contains('collapsed')) {
+                            children.classList.remove('collapsed');
+                            children.classList.add('expanded');
+                            toggle.textContent = '▼';
+                        } else {
+                            children.classList.remove('expanded');
+                            children.classList.add('collapsed');
+                            toggle.textContent = '▶';
+                        }
+                    }
+                });
+            });
         }
         
         function renderCallbacks() {
