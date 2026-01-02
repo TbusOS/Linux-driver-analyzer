@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d29922"/>
+    </marker>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="400" fill="#1e1e1e"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" fill="#cccccc" font-family="sans-serif" font-size="18" font-weight="bold">📊 Call Flow Visualization</text>
+  
+  <!-- Entry function -->
+  <rect x="50" y="80" width="180" height="40" rx="6" fill="rgba(63,185,80,0.15)" stroke="#3fb950" stroke-width="2"/>
+  <text x="140" y="105" text-anchor="middle" fill="#3fb950" font-family="monospace" font-size="14">usb_serial_probe()</text>
+  
+  <!-- Arrows and called functions -->
+  <line x1="230" y1="100" x2="300" y2="80" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="230" y1="100" x2="300" y2="120" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="230" y1="100" x2="300" y2="160" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow)"/>
+  
+  <rect x="310" y="60" width="160" height="30" rx="4" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4"/>
+  <text x="390" y="80" text-anchor="middle" fill="#58a6ff" font-family="monospace" font-size="12">kzalloc()</text>
+  
+  <rect x="310" y="100" width="160" height="30" rx="4" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4"/>
+  <text x="390" y="120" text-anchor="middle" fill="#58a6ff" font-family="monospace" font-size="12">usb_alloc_urb()</text>
+  
+  <rect x="310" y="140" width="160" height="30" rx="4" fill="rgba(210,153,34,0.1)" stroke="#d29922" stroke-width="1.5"/>
+  <text x="390" y="160" text-anchor="middle" fill="#d29922" font-family="monospace" font-size="12">serial_open()</text>
+  
+  <!-- Second level -->
+  <line x1="470" y1="155" x2="520" y2="155" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow)"/>
+  
+  <rect x="530" y="140" width="160" height="30" rx="4" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4"/>
+  <text x="610" y="160" text-anchor="middle" fill="#58a6ff" font-family="monospace" font-size="12">mutex_lock()</text>
+  
+  <!-- Async section -->
+  <rect x="50" y="200" width="180" height="40" rx="6" fill="rgba(63,185,80,0.15)" stroke="#3fb950" stroke-width="2"/>
+  <text x="140" y="225" text-anchor="middle" fill="#3fb950" font-family="monospace" font-size="14">work_handler()</text>
+  
+  <line x1="230" y1="220" x2="300" y2="200" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="230" y1="220" x2="300" y2="240" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow)"/>
+  
+  <rect x="310" y="180" width="160" height="30" rx="4" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4"/>
+  <text x="390" y="200" text-anchor="middle" fill="#58a6ff" font-family="monospace" font-size="12">msleep()</text>
+  
+  <rect x="310" y="220" width="160" height="30" rx="4" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4"/>
+  <text x="390" y="240" text-anchor="middle" fill="#58a6ff" font-family="monospace" font-size="12">schedule_work()</text>
+  
+  <!-- Legend -->
+  <rect x="50" y="300" width="700" height="80" rx="8" fill="#252526" stroke="#3c3c3c"/>
+  <text x="70" y="325" fill="#cccccc" font-family="sans-serif" font-size="12" font-weight="bold">Legend:</text>
+  
+  <rect x="70" y="340" width="20" height="14" rx="2" fill="rgba(63,185,80,0.15)" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="100" y="352" fill="#858585" font-family="sans-serif" font-size="11">Entry/Callback Function</text>
+  
+  <rect x="260" y="340" width="20" height="14" rx="2" fill="rgba(210,153,34,0.1)" stroke="#d29922" stroke-width="1.5"/>
+  <text x="290" y="352" fill="#858585" font-family="sans-serif" font-size="11">User Function</text>
+  
+  <rect x="430" y="340" width="20" height="14" rx="2" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="3"/>
+  <text x="460" y="352" fill="#858585" font-family="sans-serif" font-size="11">Kernel API</text>
+  
+  <line x1="600" y1="347" x2="640" y2="347" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="650" y="352" fill="#858585" font-family="sans-serif" font-size="11">Calls</text>
+</svg>
+

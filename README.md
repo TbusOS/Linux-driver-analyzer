@@ -1,7 +1,7 @@
 # Linux Driver Analyzer (LDA)
 
 <p align="center">
-  <img src="docs/images/logo.png" alt="Linux Driver Analyzer" width="200"/>
+  <img src="docs/images/logo.svg" alt="Linux Driver Analyzer" width="200"/>
 </p>
 
 <p align="center">
@@ -50,13 +50,13 @@
 ## 📸 截图
 
 <p align="center">
-  <img src="docs/images/call-flow-demo.png" alt="Call Flow" width="80%"/>
+  <img src="docs/images/call-flow-demo.svg" alt="Call Flow" width="80%"/>
   <br>
   <em>函数调用流可视化</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/struct-relation-demo.png" alt="Struct Relations" width="80%"/>
+  <img src="docs/images/struct-relation-demo.svg" alt="Struct Relations" width="80%"/>
   <br>
   <em>结构体关系图</em>
 </p>
