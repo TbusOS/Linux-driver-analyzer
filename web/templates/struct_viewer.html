@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux驱动结构体关系可视化</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --text-bright: #f0f6fc;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-orange: #f0883e;
+            --accent-purple: #a371f7;
+            --accent-red: #f85149;
+            --accent-cyan: #39c5cf;
+            --border-color: #30363d;
+            --link-color: #58a6ff;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Noto Sans SC', 'JetBrains Mono', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .toolbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .toolbar h1 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-bright);
+        }
+        
+        .btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-blue);
+        }
+        
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-left: auto;
+        }
+        
+        .tab {
+            padding: 6px 16px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+        
+        .tab.active {
+            background: var(--bg-tertiary);
+            border-color: var(--border-color);
+            color: var(--text-bright);
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 56px);
+        }
+        
+        .sidebar {
+            width: 320px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .sidebar-header {
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .struct-card {
+            margin: 8px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+        
+        .struct-card:hover {
+            border-color: var(--accent-blue);
+        }
+        
+        .struct-card.selected {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 0 1px var(--accent-green);
+        }
+        
+        .struct-header {
+            padding: 10px 12px;
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .struct-icon {
+            font-size: 16px;
+        }
+        
+        .struct-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+        
+        .struct-badge {
+            margin-left: auto;
+            font-size: 11px;
+            padding: 2px 8px;
+            background: var(--bg-primary);
+            border-radius: 10px;
+            color: var(--text-secondary);
+        }
+        
+        .struct-fields {
+            padding: 8px 12px;
+            display: none;
+        }
+        
+        .struct-fields.expanded {
+            display: block;
+        }
+        
+        .field-item {
+            padding: 4px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .field-type {
+            color: var(--accent-purple);
+        }
+        
+        .field-name {
+            color: var(--accent-yellow);
+        }
+        
+        .field-funcptr {
+            color: var(--accent-orange);
+        }
+        
+        .content {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* 关系图 SVG */
+        .graph-container {
+            width: 100%;
+            height: calc(100vh - 104px);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .graph-container svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .node {
+            cursor: pointer;
+        }
+        
+        .node rect {
+            fill: var(--bg-tertiary);
+            stroke: var(--accent-cyan);
+            stroke-width: 2;
+            rx: 8;
+        }
+        
+        .node:hover rect {
+            fill: var(--bg-hover);
+            stroke: var(--accent-blue);
+        }
+        
+        .node.callback rect {
+            stroke: var(--accent-green);
+        }
+        
+        .node.external rect {
+            stroke: var(--text-secondary);
+            stroke-dasharray: 4;
+        }
+        
+        .node text {
+            fill: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+        
+        .node .node-title {
+            fill: var(--accent-cyan);
+            font-weight: 600;
+        }
+        
+        .link {
+            fill: none;
+            stroke: var(--border-color);
+            stroke-width: 1.5;
+        }
+        
+        .link.contains {
+            stroke: var(--accent-purple);
+        }
+        
+        .link.references {
+            stroke: var(--accent-blue);
+            stroke-dasharray: 4;
+        }
+        
+        .link-arrow {
+            fill: var(--border-color);
+        }
+        
+        /* 函数调用图 */
+        .call-node rect {
+            stroke: var(--accent-yellow);
+        }
+        
+        .call-node.entry rect {
+            stroke: var(--accent-green);
+            fill: rgba(63, 185, 80, 0.1);
+        }
+        
+        .call-node.kernel rect {
+            stroke: var(--accent-blue);
+            stroke-dasharray: 4;
+        }
+        
+        /* 摘要卡片 */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .summary-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        .summary-card-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .summary-card-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+        
+        .summary-card-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        /* 回调函数列表 */
+        .callback-group {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        
+        .callback-group-header {
+            padding: 12px 16px;
+            background: linear-gradient(135deg, rgba(63, 185, 80, 0.1) 0%, transparent 100%);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .callback-list {
+            padding: 8px 0;
+        }
+        
+        .callback-item {
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: background 0.2s;
+        }
+        
+        .callback-item:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .callback-func {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-yellow);
+        }
+        
+        .callback-arrow {
+            color: var(--text-secondary);
+        }
+        
+        .callback-field {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-purple);
+        }
+        
+        .callback-context {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-left: auto;
+        }
+        
+        /* 加载提示 */
+        .empty-state {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <h1>📦 Linux驱动结构体关系可视化</h1>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('overview')">📊 概览</button>
+            <button class="tab" onclick="switchTab('structs')">📦 结构体图</button>
+            <button class="tab" onclick="switchTab('calls')">🔗 调用图</button>
+            <button class="tab" onclick="switchTab('callbacks')">⚡ 回调映射</button>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+            📤 导入分析结果
+        </button>
+        <button class="btn" onclick="loadDemo()">💡 加载示例</button>
+    </div>
+    
+    <input type="file" id="file-input" accept=".json" onchange="handleFileUpload(event)" />
+    
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-header">📦 结构体定义</div>
+                <div id="struct-list"></div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-header">🔧 函数指针映射</div>
+                <div id="funcptr-list"></div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div id="overview-tab" class="tab-content active">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <p>请导入分析结果JSON文件</p>
+                    <p style="margin-top: 8px; font-size: 12px;">
+                        使用 <code>python3 advanced_analyzer.py your_driver.c -o result.json</code> 生成
+                    </p>
+                    <button class="btn btn-primary" style="margin-top: 16px;" onclick="loadDemo()">
+                        💡 加载USB串口驱动示例
+                    </button>
+                </div>
+            </div>
+            
+            <div id="structs-tab" class="tab-content">
+                <div class="graph-container" id="struct-graph"></div>
+            </div>
+            
+            <div id="calls-tab" class="tab-content">
+                <div class="graph-container" id="call-graph"></div>
+            </div>
+            
+            <div id="callbacks-tab" class="tab-content">
+                <div id="callback-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let analysisData = null;
+        
+        // 示例数据
+        const demoData = {
+            "file": "03_usb_serial_driver.c",
+            "structs": {
+                "usb_serial_private": {
+                    "name": "usb_serial_private",
+                    "fields": [
+                        {"name": "lock", "type_name": "spinlock_t", "is_pointer": false, "is_function_ptr": false},
+                        {"name": "udev", "type_name": "struct usb_device *", "is_pointer": true, "is_function_ptr": false},
+                        {"name": "interface", "type_name": "struct usb_interface *", "is_pointer": true, "is_function_ptr": false},
+                        {"name": "tty", "type_name": "struct tty_struct *", "is_pointer": true, "is_function_ptr": false},
+                        {"name": "read_urb", "type_name": "struct urb *", "is_pointer": true, "is_function_ptr": false},
+                        {"name": "write_urb", "type_name": "struct urb *", "is_pointer": true, "is_function_ptr": false},
+                        {"name": "bulk_in_buffer", "type_name": "unsigned char *", "is_pointer": true, "is_function_ptr": false},
+                        {"name": "bulk_out_buffer", "type_name": "unsigned char *", "is_pointer": true, "is_function_ptr": false},
+                        {"name": "write_fifo", "type_name": "struct kfifo", "is_pointer": false, "is_function_ptr": false},
+                        {"name": "work", "type_name": "struct work_struct", "is_pointer": false, "is_function_ptr": false},
+                        {"name": "mutex", "type_name": "struct mutex", "is_pointer": false, "is_function_ptr": false}
+                    ],
+                    "start_line": 30,
+                    "referenced_structs": ["usb_device", "usb_interface", "tty_struct", "urb", "kfifo", "work_struct", "mutex"]
+                }
+            },
+            "functions": {
+                "usb_serial_init": {"name": "usb_serial_init", "is_callback": true, "callback_context": "module_init", "calls": ["alloc_tty_driver", "tty_set_operations", "tty_register_driver", "usb_register"]},
+                "usb_serial_exit": {"name": "usb_serial_exit", "is_callback": true, "callback_context": "module_exit", "calls": ["usb_deregister", "tty_unregister_driver"]},
+                "usb_serial_probe": {"name": "usb_serial_probe", "is_callback": true, "callback_context": "usb_driver.probe", "calls": ["kzalloc", "usb_get_dev", "usb_alloc_urb", "kfifo_alloc"]},
+                "usb_serial_disconnect": {"name": "usb_serial_disconnect", "is_callback": true, "callback_context": "usb_driver.disconnect", "calls": ["usb_kill_urb", "usb_free_urb", "kfree"]},
+                "serial_open": {"name": "serial_open", "is_callback": true, "callback_context": "tty_operations.open", "calls": ["mutex_lock", "usb_submit_urb", "mutex_unlock"]},
+                "serial_close": {"name": "serial_close", "is_callback": true, "callback_context": "tty_operations.close", "calls": ["mutex_lock", "usb_kill_urb", "cancel_work_sync", "mutex_unlock"]},
+                "serial_write": {"name": "serial_write", "is_callback": true, "callback_context": "tty_operations.write", "calls": ["spin_lock_irqsave", "kfifo_in", "schedule_work", "spin_unlock_irqrestore"]},
+                "serial_write_room": {"name": "serial_write_room", "is_callback": true, "callback_context": "tty_operations.write_room", "calls": ["kfifo_avail"]},
+                "serial_send_work": {"name": "serial_send_work", "is_callback": true, "callback_context": "async_work", "calls": ["kfifo_out", "usb_submit_urb"]},
+                "serial_read_bulk_callback": {"name": "serial_read_bulk_callback", "is_callback": false, "calls": ["tty_insert_flip_char", "usb_submit_urb"]},
+                "serial_write_bulk_callback": {"name": "serial_write_bulk_callback", "is_callback": false, "calls": ["schedule_work"]}
+            },
+            "func_ptr_assignments": [
+                {"struct_type": "usb_driver", "field_name": "probe", "func_name": "usb_serial_probe", "context": "USB设备插入时调用"},
+                {"struct_type": "usb_driver", "field_name": "disconnect", "func_name": "usb_serial_disconnect", "context": "USB设备移除时调用"},
+                {"struct_type": "tty_operations", "field_name": "open", "func_name": "serial_open", "context": "打开终端设备时调用"},
+                {"struct_type": "tty_operations", "field_name": "close", "func_name": "serial_close", "context": "关闭终端设备时调用"},
+                {"struct_type": "tty_operations", "field_name": "write", "func_name": "serial_write", "context": "写入终端时调用"},
+                {"struct_type": "tty_operations", "field_name": "write_room", "func_name": "serial_write_room", "context": "查询写缓冲区空间"}
+            ],
+            "struct_relations": {
+                "usb_serial_private": ["usb_device", "usb_interface", "tty_struct", "urb", "kfifo", "work_struct", "mutex"]
+            },
+            "summary": {
+                "total_structs": 1,
+                "total_functions": 11,
+                "total_callbacks": 9,
+                "func_ptr_assignments": 6,
+                "callback_groups": {
+                    "usb_driver": ["usb_serial_probe", "usb_serial_disconnect"],
+                    "tty_operations": ["serial_open", "serial_close", "serial_write", "serial_write_room"],
+                    "async_work": ["serial_send_work"],
+                    "module_init": ["usb_serial_init"],
+                    "module_exit": ["usb_serial_exit"]
+                }
+            }
+        };
+        
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        analysisData = JSON.parse(e.target.result);
+                        renderAll();
+                    } catch (err) {
+                        alert('JSON解析失败: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+        
+        function loadDemo() {
+            analysisData = demoData;
+            renderAll();
+        }
+        
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabId + '-tab').classList.add('active');
+        }
+        
+        function renderAll() {
+            renderSidebar();
+            renderOverview();
+            renderStructGraph();
+            renderCallGraph();
+            renderCallbacks();
+        }
+        
+        function renderSidebar() {
+            // 结构体列表
+            const structList = document.getElementById('struct-list');
+            const structs = Object.values(analysisData.structs || {});
+            
+            if (structs.length === 0) {
+                structList.innerHTML = '<div style="padding: 12px; color: var(--text-secondary);">无结构体定义</div>';
+            } else {
+                structList.innerHTML = structs.map(s => `
+                    <div class="struct-card" onclick="toggleStructFields(this)">
+                        <div class="struct-header">
+                            <span class="struct-icon">📦</span>
+                            <span class="struct-name">${s.name}</span>
+                            <span class="struct-badge">${s.fields?.length || 0} 字段</span>
+                        </div>
+                        <div class="struct-fields">
+                            ${(s.fields || []).map(f => `
+                                <div class="field-item">
+                                    <span class="field-type">${f.type_name}</span>
+                                    <span class="${f.is_function_ptr ? 'field-funcptr' : 'field-name'}">${f.name}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // 函数指针映射
+            const funcptrList = document.getElementById('funcptr-list');
+            const assignments = analysisData.func_ptr_assignments || [];
+            
+            if (assignments.length === 0) {
+                funcptrList.innerHTML = '<div style="padding: 12px; color: var(--text-secondary);">无函数指针映射</div>';
+            } else {
+                const grouped = {};
+                assignments.forEach(a => {
+                    if (!grouped[a.struct_type]) grouped[a.struct_type] = [];
+                    grouped[a.struct_type].push(a);
+                });
+                
+                funcptrList.innerHTML = Object.entries(grouped).map(([type, items]) => `
+                    <div class="struct-card">
+                        <div class="struct-header">
+                            <span class="struct-icon">🔧</span>
+                            <span class="struct-name">${type}</span>
+                            <span class="struct-badge">${items.length}</span>
+                        </div>
+                        <div class="struct-fields expanded">
+                            ${items.map(a => `
+                                <div class="field-item">
+                                    <span class="field-type">.${a.field_name}</span>
+                                    <span style="color: var(--text-secondary);">→</span>
+                                    <span class="field-funcptr">${a.func_name}()</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function toggleStructFields(card) {
+            card.querySelector('.struct-fields').classList.toggle('expanded');
+            card.classList.toggle('selected');
+        }
+        
+        function renderOverview() {
+            const container = document.getElementById('overview-tab');
+            const summary = analysisData.summary || {};
+            
+            container.innerHTML = `
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <div class="summary-card-title">结构体</div>
+                        <div class="summary-card-value">${summary.total_structs || 0}</div>
+                        <div class="summary-card-desc">数据结构定义</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-card-title">函数</div>
+                        <div class="summary-card-value">${summary.total_functions || 0}</div>
+                        <div class="summary-card-desc">函数定义</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-card-title">回调函数</div>
+                        <div class="summary-card-value" style="color: var(--accent-green);">${summary.total_callbacks || 0}</div>
+                        <div class="summary-card-desc">入口点函数</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-card-title">函数指针赋值</div>
+                        <div class="summary-card-value" style="color: var(--accent-purple);">${summary.func_ptr_assignments || 0}</div>
+                        <div class="summary-card-desc">ops表映射</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin-bottom: 16px; color: var(--text-bright);">🔗 结构体关系</h3>
+                ${renderStructRelations()}
+                
+                <h3 style="margin: 24px 0 16px; color: var(--text-bright);">⚡ 回调函数分组</h3>
+                ${renderCallbackGroups()}
+            `;
+        }
+        
+        function renderStructRelations() {
+            const relations = analysisData.struct_relations || {};
+            if (Object.keys(relations).length === 0) {
+                return '<p style="color: var(--text-secondary);">无结构体关系</p>';
+            }
+            
+            return Object.entries(relations).map(([struct, refs]) => `
+                <div class="callback-group">
+                    <div class="callback-group-header">
+                        <span>📦</span>
+                        <span style="color: var(--accent-cyan);">${struct}</span>
+                        <span style="color: var(--text-secondary); font-weight: normal;">包含/引用:</span>
+                    </div>
+                    <div style="padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px;">
+                        ${refs.map(r => `
+                            <span style="background: var(--bg-tertiary); padding: 4px 10px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent-purple);">
+                                ${r}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderCallbackGroups() {
+            const groups = analysisData.summary?.callback_groups || {};
+            if (Object.keys(groups).length === 0) {
+                return '<p style="color: var(--text-secondary);">无回调函数</p>';
+            }
+            
+            const icons = {
+                'usb_driver': '🔌',
+                'tty_operations': '💻',
+                'file_operations': '📁',
+                'platform_driver': '🔧',
+                'i2c_driver': '🔗',
+                'async_work': '⚙️',
+                'async_timer': '⏲️',
+                'async_tasklet': '🔄',
+                'async_irq': '⚡',
+                'async_kthread': '🧵',
+                'module_init': '🚀',
+                'module_exit': '🛑'
+            };
+            
+            return Object.entries(groups).map(([group, funcs]) => `
+                <div class="callback-group">
+                    <div class="callback-group-header">
+                        <span>${icons[group] || '📌'}</span>
+                        <span>${group}</span>
+                    </div>
+                    <div class="callback-list">
+                        ${funcs.map(f => `
+                            <div class="callback-item">
+                                <span class="callback-func">${f}()</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderStructGraph() {
+            const container = document.getElementById('struct-graph');
+            const structs = analysisData.structs || {};
+            const relations = analysisData.struct_relations || {};
+            
+            if (Object.keys(structs).length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>无结构体定义</p></div>';
+                return;
+            }
+            
+            // 简化的SVG图
+            const nodes = [];
+            const links = [];
+            
+            // 添加已定义的结构体
+            Object.keys(structs).forEach((name, i) => {
+                nodes.push({id: name, type: 'defined', x: 100, y: 100 + i * 100});
+            });
+            
+            // 添加被引用的结构体
+            const definedSet = new Set(Object.keys(structs));
+            Object.values(relations).flat().forEach(ref => {
+                if (!definedSet.has(ref) && !nodes.find(n => n.id === ref)) {
+                    nodes.push({id: ref, type: 'external', x: 400, y: 100 + nodes.length * 60});
+                }
+            });
+            
+            // 添加关系
+            Object.entries(relations).forEach(([from, tos]) => {
+                tos.forEach(to => {
+                    links.push({source: from, target: to});
+                });
+            });
+            
+            // 简单布局
+            const defined = nodes.filter(n => n.type === 'defined');
+            const external = nodes.filter(n => n.type === 'external');
+            
+            defined.forEach((n, i) => {
+                n.x = 150;
+                n.y = 80 + i * 120;
+            });
+            
+            external.forEach((n, i) => {
+                n.x = 450;
+                n.y = 50 + i * 50;
+            });
+            
+            const svgContent = `
+                <svg viewBox="0 0 700 ${Math.max(400, nodes.length * 60)}">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                                markerWidth="6" markerHeight="6" orient="auto">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-purple)" />
+                        </marker>
+                    </defs>
+                    
+                    <!-- 连线 -->
+                    ${links.map(l => {
+                        const source = nodes.find(n => n.id === l.source);
+                        const target = nodes.find(n => n.id === l.target);
+                        if (!source || !target) return '';
+                        return `<line class="link references" x1="${source.x + 100}" y1="${source.y + 20}" 
+                                      x2="${target.x - 10}" y2="${target.y + 15}" marker-end="url(#arrow)" />`;
+                    }).join('')}
+                    
+                    <!-- 节点 -->
+                    ${nodes.map(n => `
+                        <g class="node ${n.type === 'external' ? 'external' : ''}" 
+                           transform="translate(${n.x - 80}, ${n.y})">
+                            <rect width="160" height="40" />
+                            <text class="node-title" x="80" y="25" text-anchor="middle">${n.id}</text>
+                        </g>
+                    `).join('')}
+                </svg>
+            `;
+            
+            container.innerHTML = svgContent;
+        }
+        
+        function renderCallGraph() {
+            const container = document.getElementById('call-graph');
+            const functions = analysisData.functions || {};
+            
+            // 获取入口点函数
+            const entryFuncs = Object.values(functions).filter(f => f.is_callback);
+            
+            if (entryFuncs.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>无入口点函数</p></div>';
+                return;
+            }
+            
+            // 简化的调用图
+            let y = 50;
+            const nodeHeight = 35;
+            const levelGap = 200;
+            
+            let svgContent = '<svg viewBox="0 0 800 ' + (entryFuncs.length * 120 + 100) + '">';
+            svgContent += `
+                <defs>
+                    <marker id="call-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                            markerWidth="6" markerHeight="6" orient="auto">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent-yellow)" />
+                    </marker>
+                </defs>
+            `;
+            
+            entryFuncs.forEach(func => {
+                const calls = (func.calls || []).slice(0, 5); // 限制显示5个调用
+                
+                // 入口函数节点
+                svgContent += `
+                    <g class="call-node entry" transform="translate(50, ${y})">
+                        <rect width="180" height="${nodeHeight}" />
+                        <text x="90" y="22" text-anchor="middle" fill="var(--accent-green)">${func.name}()</text>
+                    </g>
+                `;
+                
+                // 调用的函数
+                calls.forEach((call, i) => {
+                    const callY = y + (i - calls.length/2 + 0.5) * 30;
+                    const isKernel = !functions[call];
+                    
+                    // 连线
+                    svgContent += `<line class="link" x1="230" y1="${y + nodeHeight/2}" 
+                                         x2="350" y2="${callY + 15}" 
+                                         stroke="var(--accent-yellow)" marker-end="url(#call-arrow)" />`;
+                    
+                    // 被调用函数节点
+                    svgContent += `
+                        <g class="call-node ${isKernel ? 'kernel' : ''}" transform="translate(360, ${callY})">
+                            <rect width="160" height="30" />
+                            <text x="80" y="20" text-anchor="middle">${call}()</text>
+                        </g>
+                    `;
+                });
+                
+                y += Math.max(calls.length * 30, 60) + 40;
+            });
+            
+            svgContent += '</svg>';
+            container.innerHTML = svgContent;
+        }
+        
+        function renderCallbacks() {
+            const container = document.getElementById('callback-content');
+            const assignments = analysisData.func_ptr_assignments || [];
+            
+            if (assignments.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>无回调映射</p></div>';
+                return;
+            }
+            
+            // 按结构体类型分组
+            const grouped = {};
+            assignments.forEach(a => {
+                if (!grouped[a.struct_type]) grouped[a.struct_type] = [];
+                grouped[a.struct_type].push(a);
+            });
+            
+            container.innerHTML = Object.entries(grouped).map(([type, items]) => `
+                <div class="callback-group">
+                    <div class="callback-group-header">
+                        <span>🔧</span>
+                        <span>struct ${type}</span>
+                    </div>
+                    <div class="callback-list">
+                        ${items.map(a => `
+                            <div class="callback-item">
+                                <span class="callback-field">.${a.field_name}</span>
+                                <span class="callback-arrow">→</span>
+                                <span class="callback-func">${a.func_name}()</span>
+                                <span class="callback-context">${a.context || ''}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
+

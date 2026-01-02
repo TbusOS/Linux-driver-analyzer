@@ -1,0 +1,718 @@
+{
+  "_description": "Linux内核框架知识库 - 用于静态分析时推断函数调用时机",
+  "_version": "1.0",
+  
+  "usb_driver": {
+    "description": "USB驱动核心结构体",
+    "header": "linux/usb.h",
+    "entry_points": {
+      "probe": {
+        "description": "设备探测",
+        "trigger": "USB设备插入，且VID/PID匹配时，由USB核心调用",
+        "icon": "🔌",
+        "context": "进程上下文，可睡眠",
+        "params": ["struct usb_interface *", "const struct usb_device_id *"]
+      },
+      "disconnect": {
+        "description": "设备断开",
+        "trigger": "USB设备移除或驱动卸载时调用",
+        "icon": "⏏️",
+        "context": "进程上下文",
+        "params": ["struct usb_interface *"]
+      },
+      "suspend": {
+        "description": "设备休眠",
+        "trigger": "系统进入休眠或设备被选择性挂起时",
+        "icon": "😴",
+        "context": "进程上下文"
+      },
+      "resume": {
+        "description": "设备唤醒",
+        "trigger": "系统从休眠恢复或设备被唤醒时",
+        "icon": "⏰",
+        "context": "进程上下文"
+      },
+      "reset_resume": {
+        "description": "重置后恢复",
+        "trigger": "设备被重置后恢复时",
+        "icon": "🔄"
+      },
+      "pre_reset": {
+        "description": "重置前",
+        "trigger": "USB设备重置前调用",
+        "icon": "⚠️"
+      },
+      "post_reset": {
+        "description": "重置后",
+        "trigger": "USB设备重置后调用",
+        "icon": "✅"
+      }
+    }
+  },
+  
+  "usb_serial_driver": {
+    "description": "USB串口驱动结构体",
+    "header": "linux/usb/serial.h",
+    "entry_points": {
+      "probe": {
+        "description": "串口设备探测",
+        "icon": "🔌"
+      },
+      "attach": {
+        "description": "设备附加",
+        "trigger": "USB串口设备连接到系统时",
+        "icon": "📎"
+      },
+      "disconnect": {
+        "description": "设备断开",
+        "icon": "⏏️"
+      },
+      "port_probe": {
+        "description": "端口探测",
+        "trigger": "每个串口端口初始化时",
+        "icon": "🔍"
+      },
+      "port_remove": {
+        "description": "端口移除",
+        "icon": "❌"
+      },
+      "open": {
+        "description": "打开端口",
+        "trigger": "用户空间打开串口设备时",
+        "icon": "📂"
+      },
+      "close": {
+        "description": "关闭端口",
+        "trigger": "用户空间关闭串口设备时",
+        "icon": "📁"
+      }
+    }
+  },
+  
+  "file_operations": {
+    "description": "文件操作结构体",
+    "header": "linux/fs.h",
+    "entry_points": {
+      "open": {
+        "description": "打开设备",
+        "trigger": "用户空间调用 open() 系统调用",
+        "icon": "📂",
+        "context": "进程上下文，可睡眠"
+      },
+      "release": {
+        "description": "关闭设备",
+        "trigger": "用户空间调用 close() 或进程退出时",
+        "icon": "📁"
+      },
+      "read": {
+        "description": "读取数据",
+        "trigger": "用户空间调用 read() 系统调用",
+        "icon": "📖"
+      },
+      "write": {
+        "description": "写入数据",
+        "trigger": "用户空间调用 write() 系统调用",
+        "icon": "✏️"
+      },
+      "unlocked_ioctl": {
+        "description": "设备控制",
+        "trigger": "用户空间调用 ioctl() 系统调用",
+        "icon": "🎛️"
+      },
+      "compat_ioctl": {
+        "description": "兼容模式ioctl",
+        "trigger": "32位程序在64位系统上调用ioctl",
+        "icon": "🔧"
+      },
+      "mmap": {
+        "description": "内存映射",
+        "trigger": "用户空间调用 mmap() 系统调用",
+        "icon": "🗺️"
+      },
+      "poll": {
+        "description": "轮询等待",
+        "trigger": "用户空间调用 poll/select/epoll",
+        "icon": "⏳"
+      },
+      "fasync": {
+        "description": "异步通知设置",
+        "trigger": "用户空间设置异步通知",
+        "icon": "🔔"
+      },
+      "llseek": {
+        "description": "文件定位",
+        "trigger": "用户空间调用 lseek()",
+        "icon": "🎯"
+      }
+    }
+  },
+  
+  "tty_operations": {
+    "description": "TTY操作结构体",
+    "header": "linux/tty_driver.h",
+    "entry_points": {
+      "open": {
+        "description": "打开TTY",
+        "trigger": "用户打开终端设备",
+        "icon": "📂"
+      },
+      "close": {
+        "description": "关闭TTY",
+        "trigger": "用户关闭终端设备",
+        "icon": "📁"
+      },
+      "write": {
+        "description": "写入TTY",
+        "trigger": "向终端写入数据",
+        "icon": "✏️"
+      },
+      "write_room": {
+        "description": "查询写缓冲区空间",
+        "trigger": "TTY层查询可写空间",
+        "icon": "📊"
+      },
+      "chars_in_buffer": {
+        "description": "查询缓冲区数据量",
+        "icon": "📏"
+      },
+      "ioctl": {
+        "description": "设备控制",
+        "trigger": "用户调用ioctl",
+        "icon": "🎛️"
+      },
+      "set_termios": {
+        "description": "设置终端属性",
+        "trigger": "用户修改终端设置(波特率等)",
+        "icon": "⚙️"
+      },
+      "throttle": {
+        "description": "流控-暂停",
+        "trigger": "输入缓冲区满时",
+        "icon": "⏸️"
+      },
+      "unthrottle": {
+        "description": "流控-恢复",
+        "trigger": "输入缓冲区有空间时",
+        "icon": "▶️"
+      }
+    }
+  },
+  
+  "i2c_driver": {
+    "description": "I2C驱动结构体",
+    "header": "linux/i2c.h",
+    "entry_points": {
+      "probe": {
+        "description": "设备探测",
+        "trigger": "I2C设备匹配成功时",
+        "icon": "🔌"
+      },
+      "remove": {
+        "description": "设备移除",
+        "trigger": "I2C设备移除或驱动卸载",
+        "icon": "⏏️"
+      },
+      "shutdown": {
+        "description": "系统关机",
+        "icon": "🔌"
+      },
+      "suspend": {
+        "description": "休眠",
+        "icon": "😴"
+      },
+      "resume": {
+        "description": "唤醒",
+        "icon": "⏰"
+      }
+    }
+  },
+  
+  "spi_driver": {
+    "description": "SPI驱动结构体",
+    "header": "linux/spi/spi.h",
+    "entry_points": {
+      "probe": {
+        "description": "设备探测",
+        "icon": "🔌"
+      },
+      "remove": {
+        "description": "设备移除",
+        "icon": "⏏️"
+      }
+    }
+  },
+  
+  "platform_driver": {
+    "description": "平台驱动结构体",
+    "header": "linux/platform_device.h",
+    "entry_points": {
+      "probe": {
+        "description": "设备探测",
+        "trigger": "平台设备与驱动匹配时",
+        "icon": "🔌"
+      },
+      "remove": {
+        "description": "设备移除",
+        "icon": "⏏️"
+      },
+      "shutdown": {
+        "description": "系统关机",
+        "icon": "⚡"
+      },
+      "suspend": {
+        "description": "休眠",
+        "icon": "😴"
+      },
+      "resume": {
+        "description": "唤醒",
+        "icon": "⏰"
+      }
+    }
+  },
+  
+  "pci_driver": {
+    "description": "PCI驱动结构体",
+    "header": "linux/pci.h",
+    "entry_points": {
+      "probe": {
+        "description": "设备探测",
+        "icon": "🔌"
+      },
+      "remove": {
+        "description": "设备移除",
+        "icon": "⏏️"
+      },
+      "suspend": {
+        "description": "休眠",
+        "icon": "😴"
+      },
+      "resume": {
+        "description": "唤醒",
+        "icon": "⏰"
+      },
+      "err_handler": {
+        "description": "错误处理",
+        "icon": "⚠️"
+      }
+    }
+  },
+  
+  "net_device_ops": {
+    "description": "网络设备操作",
+    "header": "linux/netdevice.h",
+    "entry_points": {
+      "ndo_open": {
+        "description": "打开网卡",
+        "trigger": "ifconfig up 或 ip link set up",
+        "icon": "🌐"
+      },
+      "ndo_stop": {
+        "description": "关闭网卡",
+        "trigger": "ifconfig down",
+        "icon": "🔴"
+      },
+      "ndo_start_xmit": {
+        "description": "发送数据包",
+        "trigger": "协议栈发送数据包时",
+        "icon": "📤",
+        "context": "软中断上下文，不可睡眠"
+      },
+      "ndo_get_stats": {
+        "description": "获取统计信息",
+        "icon": "📊"
+      },
+      "ndo_set_mac_address": {
+        "description": "设置MAC地址",
+        "icon": "🏷️"
+      },
+      "ndo_do_ioctl": {
+        "description": "设备控制",
+        "icon": "🎛️"
+      }
+    }
+  },
+  
+  "input_dev": {
+    "description": "输入设备结构体",
+    "header": "linux/input.h",
+    "entry_points": {
+      "open": {
+        "description": "打开输入设备",
+        "icon": "📂"
+      },
+      "close": {
+        "description": "关闭输入设备",
+        "icon": "📁"
+      },
+      "event": {
+        "description": "事件处理",
+        "trigger": "用户空间写入事件时",
+        "icon": "📨"
+      }
+    }
+  },
+  
+  "irq_handler": {
+    "description": "中断处理函数",
+    "entry_points": {
+      "handler": {
+        "description": "硬中断处理",
+        "trigger": "硬件产生中断时",
+        "icon": "⚡",
+        "context": "中断上下文，不可睡眠，不可调度"
+      },
+      "threaded_fn": {
+        "description": "线程化中断处理",
+        "trigger": "中断线程被唤醒时",
+        "icon": "🧵",
+        "context": "进程上下文，可睡眠"
+      }
+    }
+  },
+  
+  "work_struct": {
+    "description": "工作队列 - 延迟执行机制",
+    "header": "linux/workqueue.h",
+    "init_functions": ["INIT_WORK", "INIT_WORK_ONSTACK"],
+    "trigger_functions": ["schedule_work", "queue_work", "queue_work_on"],
+    "entry_points": {
+      "func": {
+        "description": "工作函数",
+        "trigger": "schedule_work() 后由内核工作线程(kworker)调用",
+        "icon": "⚙️",
+        "context": "进程上下文，可睡眠，可被调度"
+      }
+    },
+    "notes": [
+      "适合需要睡眠的延迟处理",
+      "可以使用互斥锁",
+      "不适合对时间敏感的操作"
+    ]
+  },
+  
+  "delayed_work": {
+    "description": "延迟工作队列 - 带延迟的工作队列",
+    "header": "linux/workqueue.h",
+    "init_functions": ["INIT_DELAYED_WORK"],
+    "trigger_functions": ["schedule_delayed_work", "queue_delayed_work"],
+    "entry_points": {
+      "func": {
+        "description": "延迟工作函数",
+        "trigger": "指定延迟时间后由内核工作线程调用",
+        "icon": "⏰",
+        "context": "进程上下文，可睡眠"
+      }
+    }
+  },
+  
+  "tasklet_struct": {
+    "description": "Tasklet - 软中断的一种",
+    "header": "linux/interrupt.h",
+    "init_functions": ["tasklet_init", "DECLARE_TASKLET", "DECLARE_TASKLET_DISABLED"],
+    "trigger_functions": ["tasklet_schedule", "tasklet_hi_schedule"],
+    "entry_points": {
+      "func": {
+        "description": "tasklet函数",
+        "trigger": "tasklet_schedule() 后在软中断上下文执行",
+        "icon": "🔄",
+        "context": "软中断上下文，不可睡眠，不可被调度"
+      }
+    },
+    "notes": [
+      "同一个tasklet不会在多个CPU上并发执行",
+      "不同的tasklet可以在不同CPU上并发",
+      "优先级低于硬中断，高于普通进程"
+    ]
+  },
+  
+  "timer_list": {
+    "description": "内核低精度定时器",
+    "header": "linux/timer.h",
+    "init_functions": ["timer_setup", "setup_timer", "DEFINE_TIMER"],
+    "trigger_functions": ["mod_timer", "add_timer"],
+    "entry_points": {
+      "function": {
+        "description": "定时器回调",
+        "trigger": "定时器到期时(jiffies)",
+        "icon": "⏲️",
+        "context": "软中断上下文，不可睡眠"
+      }
+    },
+    "notes": [
+      "精度取决于HZ配置(通常1-10ms)",
+      "适合非精确的周期性任务"
+    ]
+  },
+  
+  "hrtimer": {
+    "description": "高精度定时器",
+    "header": "linux/hrtimer.h",
+    "init_functions": ["hrtimer_init"],
+    "trigger_functions": ["hrtimer_start", "hrtimer_restart"],
+    "entry_points": {
+      "function": {
+        "description": "高精度定时器回调",
+        "trigger": "定时器到期时(纳秒级)",
+        "icon": "⏱️",
+        "context": "硬中断上下文，不可睡眠"
+      }
+    },
+    "notes": [
+      "纳秒级精度",
+      "基于红黑树实现",
+      "适合需要精确定时的场景"
+    ]
+  },
+  
+  "irq_handler": {
+    "description": "中断处理函数",
+    "header": "linux/interrupt.h",
+    "init_functions": ["request_irq", "devm_request_irq", "request_threaded_irq"],
+    "entry_points": {
+      "handler": {
+        "description": "硬中断处理(上半部)",
+        "trigger": "硬件产生中断时",
+        "icon": "⚡",
+        "context": "中断上下文，不可睡眠，不可被调度，需快速返回"
+      },
+      "threaded_fn": {
+        "description": "线程化中断处理(下半部)",
+        "trigger": "中断线程被唤醒时",
+        "icon": "🧵",
+        "context": "进程上下文，可睡眠"
+      }
+    },
+    "notes": [
+      "硬中断处理应尽可能短",
+      "耗时操作应放到下半部(工作队列/线程化中断)",
+      "返回IRQ_HANDLED表示已处理，IRQ_NONE表示非本设备中断"
+    ]
+  },
+  
+  "kthread": {
+    "description": "内核线程",
+    "header": "linux/kthread.h",
+    "init_functions": ["kthread_create", "kthread_run"],
+    "trigger_functions": ["wake_up_process"],
+    "entry_points": {
+      "threadfn": {
+        "description": "内核线程函数",
+        "trigger": "线程被创建/唤醒后执行",
+        "icon": "🧵",
+        "context": "进程上下文，可睡眠，独立调度"
+      }
+    },
+    "notes": [
+      "适合需要长期运行的后台任务",
+      "使用kthread_should_stop()检查是否应退出",
+      "可以使用完整的内核API"
+    ]
+  },
+  
+  "softirq": {
+    "description": "软中断 - 最底层的延迟执行机制",
+    "header": "linux/interrupt.h",
+    "init_functions": ["open_softirq"],
+    "trigger_functions": ["raise_softirq", "raise_softirq_irqoff"],
+    "types": {
+      "HI_SOFTIRQ": "高优先级tasklet",
+      "TIMER_SOFTIRQ": "定时器",
+      "NET_TX_SOFTIRQ": "网络发送",
+      "NET_RX_SOFTIRQ": "网络接收",
+      "BLOCK_SOFTIRQ": "块设备",
+      "IRQ_POLL_SOFTIRQ": "IRQ轮询",
+      "TASKLET_SOFTIRQ": "普通tasklet",
+      "SCHED_SOFTIRQ": "调度器",
+      "HRTIMER_SOFTIRQ": "高精度定时器",
+      "RCU_SOFTIRQ": "RCU"
+    },
+    "context": "软中断上下文，不可睡眠",
+    "notes": [
+      "数量固定，内核静态定义",
+      "优先级最高的延迟执行机制",
+      "同一软中断可在多CPU并发执行"
+    ]
+  },
+  
+  "rcu_callback": {
+    "description": "RCU回调 - 读-拷贝-更新机制",
+    "header": "linux/rcupdate.h",
+    "init_functions": ["call_rcu", "call_rcu_bh"],
+    "entry_points": {
+      "func": {
+        "description": "RCU回调函数",
+        "trigger": "RCU宽限期(grace period)结束后",
+        "icon": "🔒",
+        "context": "软中断上下文，不可睡眠"
+      }
+    },
+    "notes": [
+      "用于安全释放被RCU保护的数据结构",
+      "等待所有读者完成后才执行"
+    ]
+  },
+  
+  "completion": {
+    "description": "完成量 - 同步机制",
+    "header": "linux/completion.h",
+    "init_functions": ["init_completion", "DECLARE_COMPLETION"],
+    "trigger_functions": ["complete", "complete_all"],
+    "wait_functions": ["wait_for_completion", "wait_for_completion_timeout"],
+    "notes": [
+      "用于线程间同步",
+      "等待某个事件完成"
+    ]
+  },
+  
+  "kernel_apis": {
+    "_description": "常用内核API说明",
+    
+    "kzalloc": {
+      "description": "分配并清零内存",
+      "time_hint": "可能睡眠"
+    },
+    "kmalloc": {
+      "description": "分配内存",
+      "time_hint": "可能睡眠(GFP_KERNEL)"
+    },
+    "kfree": {
+      "description": "释放内存"
+    },
+    "usb_alloc_urb": {
+      "description": "分配USB请求块"
+    },
+    "usb_free_urb": {
+      "description": "释放USB请求块"
+    },
+    "usb_submit_urb": {
+      "description": "提交URB进行异步传输",
+      "time_hint": "立即返回"
+    },
+    "usb_kill_urb": {
+      "description": "取消并等待URB完成",
+      "time_hint": "可能阻塞"
+    },
+    "usb_bulk_msg": {
+      "description": "同步批量传输",
+      "time_hint": "阻塞直到完成"
+    },
+    "usb_control_msg": {
+      "description": "同步控制传输",
+      "time_hint": "阻塞直到完成"
+    },
+    "usb_fill_bulk_urb": {
+      "description": "填充批量URB"
+    },
+    "usb_fill_control_urb": {
+      "description": "填充控制URB"
+    },
+    "usb_fill_int_urb": {
+      "description": "填充中断URB"
+    },
+    "usb_register": {
+      "description": "注册USB驱动"
+    },
+    "usb_deregister": {
+      "description": "注销USB驱动"
+    },
+    "usb_get_dev": {
+      "description": "增加USB设备引用计数"
+    },
+    "usb_put_dev": {
+      "description": "减少USB设备引用计数"
+    },
+    "usb_set_intfdata": {
+      "description": "设置接口私有数据"
+    },
+    "usb_get_intfdata": {
+      "description": "获取接口私有数据"
+    },
+    "mutex_lock": {
+      "description": "获取互斥锁",
+      "time_hint": "可能睡眠"
+    },
+    "mutex_unlock": {
+      "description": "释放互斥锁"
+    },
+    "spin_lock_irqsave": {
+      "description": "获取自旋锁并保存中断状态"
+    },
+    "spin_unlock_irqrestore": {
+      "description": "释放自旋锁并恢复中断状态"
+    },
+    "schedule_work": {
+      "description": "调度工作队列",
+      "time_hint": "立即返回"
+    },
+    "cancel_work_sync": {
+      "description": "取消并等待工作完成",
+      "time_hint": "可能阻塞"
+    },
+    "copy_to_user": {
+      "description": "从内核拷贝数据到用户空间",
+      "time_hint": "可能页错误"
+    },
+    "copy_from_user": {
+      "description": "从用户空间拷贝数据到内核",
+      "time_hint": "可能页错误"
+    },
+    "tty_insert_flip_char": {
+      "description": "向TTY flip缓冲区插入字符"
+    },
+    "tty_flip_buffer_push": {
+      "description": "推送TTY缓冲区数据"
+    },
+    "alloc_tty_driver": {
+      "description": "分配TTY驱动结构"
+    },
+    "tty_register_driver": {
+      "description": "注册TTY驱动"
+    },
+    "tty_unregister_driver": {
+      "description": "注销TTY驱动"
+    },
+    "put_tty_driver": {
+      "description": "释放TTY驱动引用"
+    },
+    "tty_set_operations": {
+      "description": "设置TTY操作函数表"
+    },
+    "kfifo_alloc": {
+      "description": "分配FIFO缓冲区"
+    },
+    "kfifo_free": {
+      "description": "释放FIFO缓冲区"
+    },
+    "kfifo_in": {
+      "description": "向FIFO写入数据"
+    },
+    "kfifo_out": {
+      "description": "从FIFO读取数据"
+    },
+    "kfifo_avail": {
+      "description": "查询FIFO可用空间"
+    },
+    "dev_err": {
+      "description": "打印设备错误日志"
+    },
+    "dev_info": {
+      "description": "打印设备信息日志"
+    },
+    "dev_warn": {
+      "description": "打印设备警告日志"
+    },
+    "pr_info": {
+      "description": "打印内核信息日志"
+    },
+    "pr_err": {
+      "description": "打印内核错误日志"
+    },
+    "container_of": {
+      "description": "根据成员指针获取容器结构体指针"
+    },
+    "INIT_WORK": {
+      "description": "初始化工作结构"
+    }
+  }
+}
+

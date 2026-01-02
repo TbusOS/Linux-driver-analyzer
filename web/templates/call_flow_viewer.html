@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux驱动函数调用流可视化</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 深色主题 - 类似VSCode Dark+ */
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #252526;
+            --bg-tertiary: #2d2d2d;
+            --bg-hover: #37373d;
+            --text-primary: #cccccc;
+            --text-secondary: #858585;
+            --text-bright: #ffffff;
+            --accent-blue: #569cd6;
+            --accent-green: #4ec9b0;
+            --accent-yellow: #dcdcaa;
+            --accent-orange: #ce9178;
+            --accent-purple: #c586c0;
+            --accent-red: #f44747;
+            --border-color: #3c3c3c;
+            --line-color: #404040;
+            --shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Noto Sans SC', 'JetBrains Mono', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        /* 顶部工具栏 */
+        .toolbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .toolbar h1 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-bright);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .toolbar h1::before {
+            content: '🔬';
+        }
+        
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        
+        .btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-bright);
+        }
+        
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #4a8bc4;
+        }
+        
+        /* 搜索框 */
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0 10px;
+        }
+        
+        .search-box input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            padding: 6px;
+            font-size: 13px;
+            width: 200px;
+            outline: none;
+        }
+        
+        .search-box input::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        .search-icon {
+            color: var(--text-secondary);
+        }
+        
+        /* 主内容区 */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 56px);
+        }
+        
+        /* 左侧边栏 - 文件列表和摘要 */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-section {
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .sidebar-header {
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+        
+        .summary-item {
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        
+        .summary-item .label {
+            color: var(--text-secondary);
+        }
+        
+        .summary-item .value {
+            color: var(--accent-blue);
+            font-weight: 500;
+        }
+        
+        .struct-list {
+            padding: 8px 16px;
+        }
+        
+        .struct-item {
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .struct-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .struct-type {
+            color: var(--accent-green);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+        
+        .struct-var {
+            color: var(--accent-yellow);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        
+        /* 右侧主内容 - 调用流程 */
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        
+        /* 调用树样式 */
+        .call-tree {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+        
+        .tree-node {
+            position: relative;
+            padding-left: 24px;
+        }
+        
+        .tree-node::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--line-color);
+        }
+        
+        .tree-node:last-child::before {
+            height: 16px;
+        }
+        
+        .node-header {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+            position: relative;
+        }
+        
+        .node-header::before {
+            content: '';
+            position: absolute;
+            left: -16px;
+            top: 50%;
+            width: 12px;
+            height: 1px;
+            background: var(--line-color);
+        }
+        
+        .node-header:hover {
+            background: var(--bg-hover);
+        }
+        
+        .node-toggle {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            margin-right: 4px;
+            font-size: 10px;
+            transition: transform 0.2s;
+        }
+        
+        .node-toggle.expanded {
+            transform: rotate(90deg);
+        }
+        
+        .node-toggle.empty {
+            visibility: hidden;
+        }
+        
+        .node-icon {
+            margin-right: 6px;
+            font-size: 14px;
+        }
+        
+        .node-name {
+            color: var(--accent-yellow);
+        }
+        
+        .node-name.entry-point {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+        
+        .node-name.kernel-api {
+            color: var(--accent-blue);
+        }
+        
+        .node-name.recursive {
+            color: var(--accent-red);
+            font-style: italic;
+        }
+        
+        .node-line {
+            color: var(--text-secondary);
+            margin-left: 8px;
+            font-size: 11px;
+        }
+        
+        .node-desc {
+            color: var(--accent-orange);
+            margin-left: 8px;
+            font-size: 11px;
+            font-style: italic;
+        }
+        
+        .node-time {
+            color: var(--accent-purple);
+            margin-left: 8px;
+            font-size: 11px;
+        }
+        
+        .node-children {
+            display: none;
+        }
+        
+        .node-children.expanded {
+            display: block;
+        }
+        
+        /* 根节点样式 */
+        .root-node {
+            margin-bottom: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .root-header {
+            background: linear-gradient(135deg, #2d5a3d 0%, #1e3a29 100%);
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        
+        .root-header:hover {
+            background: linear-gradient(135deg, #367048 0%, #254432 100%);
+        }
+        
+        .root-header.probe {
+            background: linear-gradient(135deg, #2d5a3d 0%, #1e3a29 100%);
+        }
+        
+        .root-header.disconnect {
+            background: linear-gradient(135deg, #5a2d2d 0%, #3a1e1e 100%);
+        }
+        
+        .root-header.init {
+            background: linear-gradient(135deg, #2d3d5a 0%, #1e293a 100%);
+        }
+        
+        .root-header.exit {
+            background: linear-gradient(135deg, #5a4a2d 0%, #3a321e 100%);
+        }
+        
+        .root-header.open, .root-header.write, .root-header.read {
+            background: linear-gradient(135deg, #3d2d5a 0%, #291e3a 100%);
+        }
+        
+        .root-header.close {
+            background: linear-gradient(135deg, #4a3d2d 0%, #32291e 100%);
+        }
+        
+        .root-icon {
+            font-size: 20px;
+        }
+        
+        .root-title {
+            color: var(--text-bright);
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .root-trigger {
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            margin-left: auto;
+        }
+        
+        .root-expand {
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        
+        .root-expand.expanded {
+            transform: rotate(180deg);
+        }
+        
+        .root-body {
+            padding: 16px;
+            display: none;
+        }
+        
+        .root-body.expanded {
+            display: block;
+        }
+        
+        /* 统计徽章 */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-left: 8px;
+        }
+        
+        /* 文件上传区域 */
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 48px;
+            text-align: center;
+            margin-bottom: 24px;
+            transition: all 0.2s;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--accent-blue);
+            background: rgba(86, 156, 214, 0.05);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--accent-green);
+            background: rgba(78, 201, 176, 0.1);
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .upload-text {
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+        
+        .upload-hint {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        
+        /* 加载指示器 */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            color: var(--text-secondary);
+        }
+        
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 工具提示 */
+        .tooltip {
+            position: fixed;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            max-width: 300px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        
+        .tooltip.visible {
+            opacity: 1;
+        }
+        
+        .tooltip-title {
+            color: var(--accent-yellow);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .tooltip-desc {
+            color: var(--text-primary);
+        }
+        
+        /* 隐藏的文件输入 */
+        #file-input {
+            display: none;
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* 快捷键提示 */
+        .shortcuts {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 12px;
+        }
+        
+        .shortcut-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .shortcut-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .shortcut-key {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: var(--accent-blue);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* 高亮搜索结果 */
+        .highlight {
+            background: rgba(255, 215, 0, 0.3);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <h1>Linux驱动函数调用流可视化</h1>
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="搜索函数名..." />
+        </div>
+        <div class="toolbar-actions">
+            <button class="btn" onclick="expandAll()">📂 全部展开</button>
+            <button class="btn" onclick="collapseAll()">📁 全部折叠</button>
+            <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+                📤 导入JSON
+            </button>
+            <button class="btn" onclick="loadDemo()">💡 加载示例</button>
+        </div>
+    </div>
+    
+    <input type="file" id="file-input" accept=".json" onchange="handleFileUpload(event)" />
+    
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-header">📊 分析摘要</div>
+                <div id="summary-content">
+                    <div class="summary-item">
+                        <span class="label">请导入分析结果</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-header">🔧 操作结构体</div>
+                <div id="struct-list" class="struct-list">
+                    <div class="summary-item">
+                        <span class="label">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-header">⚡ 异步处理函数</div>
+                <div id="async-list" class="struct-list">
+                    <div class="summary-item">
+                        <span class="label">-</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-header">📁 函数列表</div>
+                <div id="function-list" class="struct-list">
+                    <div class="summary-item">
+                        <span class="label">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content" id="content">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">拖拽JSON文件到这里，或点击"导入JSON"按钮</div>
+                <div class="upload-hint">
+                    使用 <code>python c_call_analyzer.py your_driver.c -o result.json</code> 生成分析结果
+                </div>
+                <div style="margin-top: 24px;">
+                    <button class="btn btn-primary" onclick="loadDemo()" style="margin: 0 auto;">
+                        💡 点击加载USB串口驱动示例
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip" id="tooltip">
+        <div class="tooltip-title"></div>
+        <div class="tooltip-desc"></div>
+    </div>
+    
+    <div class="shortcuts">
+        <div class="shortcut-item">
+            <span class="shortcut-key">E</span>
+            <span>全部展开</span>
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">C</span>
+            <span>全部折叠</span>
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">/</span>
+            <span>搜索</span>
+        </div>
+    </div>
+
+    <script>
+        // 全局数据
+        let analysisData = null;
+        let expandedNodes = new Set();
+        
+        // 示例数据 - USB串口驱动分析结果
+        const demoData = {
+            "file": "03_usb_serial_driver.c",
+            "summary": {
+                "total_functions": 12,
+                "callbacks": 6,
+                "struct_ops_count": 2,
+                "struct_types": ["usb_driver", "tty_operations"],
+                "async_handlers_count": 1,
+                "async_handlers_by_type": {
+                    "work": [
+                        {"func": "serial_send_work", "context": "进程上下文，可睡眠", "line": 291}
+                    ]
+                },
+                "most_complex": [
+                    ["usb_serial_probe", 15],
+                    ["serial_open", 8],
+                    ["usb_serial_init", 7]
+                ]
+            },
+            "struct_ops": [
+                {
+                    "struct_type": "usb_driver",
+                    "var_name": "usb_serial_driver",
+                    "mappings": {
+                        "probe": "usb_serial_probe",
+                        "disconnect": "usb_serial_disconnect"
+                    },
+                    "line": 400
+                },
+                {
+                    "struct_type": "tty_operations",
+                    "var_name": "serial_ops",
+                    "mappings": {
+                        "open": "serial_open",
+                        "close": "serial_close",
+                        "write": "serial_write",
+                        "write_room": "serial_write_room"
+                    },
+                    "line": 263
+                }
+            ],
+            "async_handlers": [
+                {
+                    "handler_type": "work",
+                    "func_name": "serial_send_work",
+                    "init_pattern": "INIT_WORK(&priv->work, serial_send_work)",
+                    "trigger_pattern": "schedule_work",
+                    "line": 291,
+                    "context": "进程上下文，可睡眠",
+                    "extra_info": {"icon": "⚙️", "desc": "工作队列"}
+                }
+            ],
+            "functions": {
+                "serial_read_bulk_callback": {"start_line": 54, "calls": ["tty_insert_flip_char", "tty_flip_buffer_push", "usb_submit_urb", "dev_err"]},
+                "serial_write_bulk_callback": {"start_line": 99, "calls": ["dev_err", "schedule_work"]},
+                "serial_send_work": {"start_line": 115, "calls": ["container_of", "spin_lock_irqsave", "spin_unlock_irqrestore", "kfifo_out", "usb_submit_urb", "dev_err"]},
+                "serial_open": {"start_line": 154, "calls": ["mutex_lock", "mutex_unlock", "usb_fill_bulk_urb", "usb_submit_urb", "dev_err"]},
+                "serial_close": {"start_line": 195, "calls": ["mutex_lock", "mutex_unlock", "usb_kill_urb", "cancel_work_sync"]},
+                "serial_write": {"start_line": 222, "calls": ["spin_lock_irqsave", "spin_unlock_irqrestore", "kfifo_in", "schedule_work"]},
+                "serial_write_room": {"start_line": 246, "calls": ["spin_lock_irqsave", "spin_unlock_irqrestore", "kfifo_avail"]},
+                "usb_serial_probe": {"start_line": 271, "calls": ["interface_to_usbdev", "kzalloc", "spin_lock_init", "mutex_init", "usb_get_dev", "INIT_WORK", "usb_endpoint_is_bulk_in", "usb_endpoint_maxp", "kmalloc", "usb_endpoint_is_bulk_out", "usb_alloc_urb", "usb_fill_bulk_urb", "kfifo_alloc", "usb_set_intfdata", "dev_info", "usb_free_urb", "kfree", "kfifo_free", "usb_put_dev"]},
+                "usb_serial_disconnect": {"start_line": 366, "calls": ["usb_get_intfdata", "usb_kill_urb", "cancel_work_sync", "usb_free_urb", "kfree", "kfifo_free", "usb_put_dev", "usb_set_intfdata", "dev_info"]},
+                "usb_serial_init": {"start_line": 408, "calls": ["alloc_tty_driver", "tty_set_operations", "tty_register_driver", "put_tty_driver", "usb_register", "tty_unregister_driver", "pr_info"]},
+                "usb_serial_exit": {"start_line": 449, "calls": ["usb_deregister", "tty_unregister_driver", "put_tty_driver", "pr_info"]}
+            },
+            "call_tree": [
+                {
+                    "name": "usb_serial_init",
+                    "display_name": "🚀 [模块加载] → usb_serial_init()",
+                    "line": 408,
+                    "type": "entry_point",
+                    "description": "insmod/modprobe 加载驱动时调用",
+                    "children": [
+                        {"name": "alloc_tty_driver", "display_name": "alloc_tty_driver()", "type": "kernel_api", "description": "分配TTY驱动结构", "children": []},
+                        {"name": "tty_set_operations", "display_name": "tty_set_operations()", "type": "kernel_api", "description": "设置TTY操作函数表", "children": []},
+                        {"name": "tty_register_driver", "display_name": "tty_register_driver()", "type": "kernel_api", "description": "注册TTY驱动", "children": []},
+                        {"name": "usb_register", "display_name": "usb_register()", "type": "kernel_api", "description": "注册USB驱动", "children": []},
+                        {"name": "pr_info", "display_name": "pr_info()", "type": "kernel_api", "description": "打印内核信息日志", "children": []}
+                    ]
+                },
+                {
+                    "name": "usb_serial_probe",
+                    "display_name": "🔌 [设备插入] → usb_serial_probe()",
+                    "line": 271,
+                    "type": "entry_point",
+                    "description": "USB设备插入，且VID/PID匹配时，由USB核心调用",
+                    "children": [
+                        {"name": "interface_to_usbdev", "display_name": "interface_to_usbdev()", "type": "kernel_api", "description": "获取USB设备结构", "children": []},
+                        {"name": "kzalloc", "display_name": "kzalloc()", "type": "kernel_api", "description": "分配并清零内存", "time_info": "可能睡眠", "children": []},
+                        {"name": "spin_lock_init", "display_name": "spin_lock_init()", "type": "kernel_api", "children": []},
+                        {"name": "mutex_init", "display_name": "mutex_init()", "type": "kernel_api", "children": []},
+                        {"name": "usb_get_dev", "display_name": "usb_get_dev()", "type": "kernel_api", "description": "增加USB设备引用计数", "children": []},
+                        {"name": "INIT_WORK", "display_name": "INIT_WORK()", "type": "kernel_api", "description": "初始化工作结构", "children": []},
+                        {"name": "kmalloc", "display_name": "kmalloc()", "type": "kernel_api", "description": "分配内存", "time_info": "可能睡眠", "children": []},
+                        {"name": "usb_alloc_urb", "display_name": "usb_alloc_urb()", "type": "kernel_api", "description": "分配USB请求块", "children": []},
+                        {"name": "usb_fill_bulk_urb", "display_name": "usb_fill_bulk_urb()", "type": "kernel_api", "description": "填充批量URB", "children": []},
+                        {"name": "kfifo_alloc", "display_name": "kfifo_alloc()", "type": "kernel_api", "description": "分配FIFO缓冲区", "children": []},
+                        {"name": "usb_set_intfdata", "display_name": "usb_set_intfdata()", "type": "kernel_api", "description": "设置接口私有数据", "children": []},
+                        {"name": "dev_info", "display_name": "dev_info()", "type": "kernel_api", "description": "打印设备信息日志", "children": []}
+                    ]
+                },
+                {
+                    "name": "serial_open",
+                    "display_name": "📂 [打开TTY] → serial_open()",
+                    "line": 154,
+                    "type": "entry_point",
+                    "description": "用户空间打开 /dev/ttyUSBx 时调用",
+                    "children": [
+                        {"name": "mutex_lock", "display_name": "mutex_lock()", "type": "kernel_api", "description": "获取互斥锁", "time_info": "可能睡眠", "children": []},
+                        {"name": "usb_fill_bulk_urb", "display_name": "usb_fill_bulk_urb()", "type": "kernel_api", "description": "填充批量URB", "children": []},
+                        {
+                            "name": "usb_submit_urb",
+                            "display_name": "usb_submit_urb()",
+                            "type": "kernel_api",
+                            "description": "提交URB进行异步传输",
+                            "time_info": "立即返回",
+                            "children": [
+                                {
+                                    "name": "serial_read_bulk_callback",
+                                    "display_name": "📥 [URB完成回调] → serial_read_bulk_callback()",
+                                    "line": 54,
+                                    "type": "callback",
+                                    "description": "URB传输完成后由USB核心调用",
+                                    "children": [
+                                        {"name": "tty_insert_flip_char", "display_name": "tty_insert_flip_char()", "type": "kernel_api", "description": "向TTY缓冲区插入字符", "children": []},
+                                        {"name": "tty_flip_buffer_push", "display_name": "tty_flip_buffer_push()", "type": "kernel_api", "description": "推送TTY缓冲区数据", "children": []},
+                                        {"name": "usb_submit_urb", "display_name": "usb_submit_urb() [递归/重新提交]", "type": "recursive", "children": []}
+                                    ]
+                                }
+                            ]
+                        },
+                        {"name": "mutex_unlock", "display_name": "mutex_unlock()", "type": "kernel_api", "description": "释放互斥锁", "children": []}
+                    ]
+                },
+                {
+                    "name": "serial_write",
+                    "display_name": "✏️ [写入TTY] → serial_write()",
+                    "line": 222,
+                    "type": "entry_point",
+                    "description": "用户空间向串口写入数据时调用",
+                    "children": [
+                        {"name": "spin_lock_irqsave", "display_name": "spin_lock_irqsave()", "type": "kernel_api", "description": "获取自旋锁并保存中断状态", "children": []},
+                        {"name": "kfifo_in", "display_name": "kfifo_in()", "type": "kernel_api", "description": "向FIFO写入数据", "children": []},
+                        {"name": "spin_unlock_irqrestore", "display_name": "spin_unlock_irqrestore()", "type": "kernel_api", "description": "释放自旋锁并恢复中断状态", "children": []},
+                        {
+                            "name": "schedule_work",
+                            "display_name": "schedule_work()",
+                            "type": "kernel_api",
+                            "description": "调度工作队列",
+                            "time_info": "立即返回",
+                            "children": [
+                                {
+                                    "name": "serial_send_work",
+                                    "display_name": "⚙️ [工作队列] → serial_send_work()",
+                                    "line": 115,
+                                    "type": "callback",
+                                    "description": "由内核工作线程异步调用",
+                                    "children": [
+                                        {"name": "spin_lock_irqsave", "display_name": "spin_lock_irqsave()", "type": "kernel_api", "children": []},
+                                        {"name": "kfifo_out", "display_name": "kfifo_out()", "type": "kernel_api", "description": "从FIFO读取数据", "children": []},
+                                        {"name": "spin_unlock_irqrestore", "display_name": "spin_unlock_irqrestore()", "type": "kernel_api", "children": []},
+                                        {
+                                            "name": "usb_submit_urb",
+                                            "display_name": "usb_submit_urb()",
+                                            "type": "kernel_api",
+                                            "children": [
+                                                {
+                                                    "name": "serial_write_bulk_callback",
+                                                    "display_name": "📤 [写URB完成] → serial_write_bulk_callback()",
+                                                    "line": 99,
+                                                    "type": "callback",
+                                                    "children": [
+                                                        {"name": "schedule_work", "display_name": "schedule_work() → serial_send_work [可能继续发送]", "type": "recursive", "children": []}
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "serial_close",
+                    "display_name": "📁 [关闭TTY] → serial_close()",
+                    "line": 195,
+                    "type": "entry_point",
+                    "description": "用户空间关闭串口设备时调用",
+                    "children": [
+                        {"name": "mutex_lock", "display_name": "mutex_lock()", "type": "kernel_api", "description": "获取互斥锁", "children": []},
+                        {"name": "usb_kill_urb", "display_name": "usb_kill_urb()", "type": "kernel_api", "description": "取消并等待URB完成", "time_info": "可能阻塞", "children": []},
+                        {"name": "cancel_work_sync", "display_name": "cancel_work_sync()", "type": "kernel_api", "description": "取消并等待工作完成", "time_info": "可能阻塞", "children": []},
+                        {"name": "mutex_unlock", "display_name": "mutex_unlock()", "type": "kernel_api", "description": "释放互斥锁", "children": []}
+                    ]
+                },
+                {
+                    "name": "usb_serial_disconnect",
+                    "display_name": "⏏️ [设备移除] → usb_serial_disconnect()",
+                    "line": 366,
+                    "type": "entry_point",
+                    "description": "USB设备移除时，由USB核心调用",
+                    "children": [
+                        {"name": "usb_get_intfdata", "display_name": "usb_get_intfdata()", "type": "kernel_api", "description": "获取接口私有数据", "children": []},
+                        {"name": "usb_kill_urb", "display_name": "usb_kill_urb()", "type": "kernel_api", "description": "取消并等待URB完成", "children": []},
+                        {"name": "cancel_work_sync", "display_name": "cancel_work_sync()", "type": "kernel_api", "description": "取消并等待工作完成", "children": []},
+                        {"name": "usb_free_urb", "display_name": "usb_free_urb()", "type": "kernel_api", "description": "释放USB请求块", "children": []},
+                        {"name": "kfree", "display_name": "kfree()", "type": "kernel_api", "description": "释放内存", "children": []},
+                        {"name": "kfifo_free", "display_name": "kfifo_free()", "type": "kernel_api", "description": "释放FIFO缓冲区", "children": []},
+                        {"name": "usb_put_dev", "display_name": "usb_put_dev()", "type": "kernel_api", "description": "减少USB设备引用计数", "children": []},
+                        {"name": "usb_set_intfdata", "display_name": "usb_set_intfdata()", "type": "kernel_api", "description": "设置接口私有数据", "children": []},
+                        {"name": "dev_info", "display_name": "dev_info()", "type": "kernel_api", "description": "打印设备信息日志", "children": []}
+                    ]
+                },
+                {
+                    "name": "usb_serial_exit",
+                    "display_name": "🛑 [模块卸载] → usb_serial_exit()",
+                    "line": 449,
+                    "type": "entry_point",
+                    "description": "rmmod 卸载驱动时调用",
+                    "children": [
+                        {"name": "usb_deregister", "display_name": "usb_deregister()", "type": "kernel_api", "description": "注销USB驱动", "children": []},
+                        {"name": "tty_unregister_driver", "display_name": "tty_unregister_driver()", "type": "kernel_api", "description": "注销TTY驱动", "children": []},
+                        {"name": "put_tty_driver", "display_name": "put_tty_driver()", "type": "kernel_api", "description": "释放TTY驱动引用", "children": []},
+                        {"name": "pr_info", "display_name": "pr_info()", "type": "kernel_api", "description": "打印内核信息日志", "children": []}
+                    ]
+                }
+            ]
+        };
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDragDrop();
+            setupSearch();
+            setupKeyboardShortcuts();
+        });
+        
+        // 拖拽上传
+        function setupDragDrop() {
+            const uploadArea = document.getElementById('upload-area');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.classList.add('dragover');
+                });
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.classList.remove('dragover');
+                });
+            });
+            
+            uploadArea.addEventListener('drop', e => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.endsWith('.json')) {
+                    loadFile(files[0]);
+                }
+            });
+        }
+        
+        // 搜索功能
+        function setupSearch() {
+            const searchInput = document.getElementById('search-input');
+            let searchTimeout;
+            
+            searchInput.addEventListener('input', e => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    searchFunctions(e.target.value);
+                }, 200);
+            });
+        }
+        
+        // 键盘快捷键
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', e => {
+                if (e.target.tagName === 'INPUT') return;
+                
+                switch(e.key.toLowerCase()) {
+                    case 'e':
+                        expandAll();
+                        break;
+                    case 'c':
+                        collapseAll();
+                        break;
+                    case '/':
+                        e.preventDefault();
+                        document.getElementById('search-input').focus();
+                        break;
+                }
+            });
+        }
+        
+        // 文件上传处理
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                loadFile(file);
+            }
+        }
+        
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    renderAnalysis(data);
+                } catch (err) {
+                    alert('JSON解析失败: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        // 加载示例
+        function loadDemo() {
+            renderAnalysis(demoData);
+        }
+        
+        // 渲染分析结果
+        function renderAnalysis(data) {
+            analysisData = data;
+            renderSummary(data.summary);
+            renderStructOps(data.struct_ops);
+            renderAsyncHandlers(data.async_handlers || [], data.summary?.async_handlers_by_type || {});
+            renderFunctionList(data.functions);
+            renderCallTree(data.call_tree);
+        }
+        
+        // 渲染摘要
+        function renderSummary(summary) {
+            const container = document.getElementById('summary-content');
+            container.innerHTML = `
+                <div class="summary-item">
+                    <span class="label">函数总数</span>
+                    <span class="value">${summary.total_functions}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="label">回调函数</span>
+                    <span class="value">${summary.callbacks}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="label">操作结构体</span>
+                    <span class="value">${summary.struct_ops_count}</span>
+                </div>
+            `;
+        }
+        
+        // 渲染操作结构体列表
+        function renderStructOps(structOps) {
+            const container = document.getElementById('struct-list');
+            if (!structOps || structOps.length === 0) {
+                container.innerHTML = '<div class="summary-item"><span class="label">无</span></div>';
+                return;
+            }
+            
+            container.innerHTML = structOps.map(s => `
+                <div class="struct-item" onclick="highlightStruct('${s.struct_type}')">
+                    <span class="struct-type">${s.struct_type}</span>
+                    <span class="struct-var">${s.var_name}</span>
+                </div>
+            `).join('');
+        }
+        
+        // 渲染异步处理函数列表
+        function renderAsyncHandlers(handlers, handlersByType) {
+            const container = document.getElementById('async-list');
+            
+            // 如果没有异步处理函数
+            if ((!handlers || handlers.length === 0) && Object.keys(handlersByType).length === 0) {
+                container.innerHTML = '<div class="summary-item"><span class="label">无</span></div>';
+                return;
+            }
+            
+            const typeIcons = {
+                'work': '⚙️',
+                'delayed_work': '⏰',
+                'irq': '⚡',
+                'threaded_irq': '🧵',
+                'tasklet': '🔄',
+                'timer': '⏲️',
+                'hrtimer': '⏱️',
+                'hrtimer_assign': '⏱️',
+                'kthread': '🧵',
+                'rcu': '🔒',
+                'softirq': '⚡'
+            };
+            
+            const typeNames = {
+                'work': '工作队列',
+                'delayed_work': '延迟工作',
+                'irq': '硬中断',
+                'threaded_irq': '线程化中断',
+                'tasklet': 'Tasklet',
+                'timer': '定时器',
+                'hrtimer': '高精度定时器',
+                'hrtimer_assign': '高精度定时器',
+                'kthread': '内核线程',
+                'rcu': 'RCU回调',
+                'softirq': '软中断'
+            };
+            
+            let html = '';
+            
+            // 优先使用 handlersByType（来自summary）
+            if (Object.keys(handlersByType).length > 0) {
+                for (const [type, items] of Object.entries(handlersByType)) {
+                    const icon = typeIcons[type] || '📌';
+                    const typeName = typeNames[type] || type;
+                    html += `<div class="struct-item" style="background: transparent; cursor: default;">
+                        <span style="color: var(--accent-orange);">${icon} ${typeName}</span>
+                    </div>`;
+                    for (const item of items) {
+                        html += `<div class="struct-item" onclick="scrollToFunction('${item.func}')" style="margin-left: 12px;">
+                            <span class="struct-type">L${item.line || '?'}</span>
+                            <span class="struct-var">${item.func}()</span>
+                        </div>`;
+                    }
+                }
+            } else if (handlers && handlers.length > 0) {
+                // 回退到 handlers 数组
+                const grouped = {};
+                for (const h of handlers) {
+                    if (!grouped[h.handler_type]) grouped[h.handler_type] = [];
+                    grouped[h.handler_type].push(h);
+                }
+                
+                for (const [type, items] of Object.entries(grouped)) {
+                    const icon = typeIcons[type] || '📌';
+                    const typeName = typeNames[type] || type;
+                    html += `<div class="struct-item" style="background: transparent; cursor: default;">
+                        <span style="color: var(--accent-orange);">${icon} ${typeName}</span>
+                    </div>`;
+                    for (const item of items) {
+                        html += `<div class="struct-item" onclick="scrollToFunction('${item.func_name}')" style="margin-left: 12px;">
+                            <span class="struct-type">L${item.line || '?'}</span>
+                            <span class="struct-var">${item.func_name}()</span>
+                        </div>`;
+                    }
+                }
+            }
+            
+            container.innerHTML = html || '<div class="summary-item"><span class="label">无</span></div>';
+        }
+        
+        // 渲染函数列表
+        function renderFunctionList(functions) {
+            const container = document.getElementById('function-list');
+            if (!functions || Object.keys(functions).length === 0) {
+                container.innerHTML = '<div class="summary-item"><span class="label">无</span></div>';
+                return;
+            }
+            
+            const sortedFuncs = Object.entries(functions)
+                .sort((a, b) => a[1].start_line - b[1].start_line);
+            
+            container.innerHTML = sortedFuncs.map(([name, func]) => `
+                <div class="struct-item" onclick="scrollToFunction('${name}')">
+                    <span class="struct-type">L${func.start_line}</span>
+                    <span class="struct-var">${name}()</span>
+                </div>
+            `).join('');
+        }
+        
+        // 渲染调用树
+        function renderCallTree(callTree) {
+            const container = document.getElementById('content');
+            
+            if (!callTree || callTree.length === 0) {
+                container.innerHTML = '<div class="loading">没有找到入口点函数</div>';
+                return;
+            }
+            
+            const html = callTree.map(node => renderRootNode(node)).join('');
+            container.innerHTML = `<div class="call-tree">${html}</div>`;
+        }
+        
+        // 渲染根节点（入口点）
+        function renderRootNode(node) {
+            const nodeId = `root-${node.name}`;
+            const headerClass = getHeaderClass(node.name);
+            const icon = getNodeIcon(node);
+            
+            return `
+                <div class="root-node" data-function="${node.name}">
+                    <div class="root-header ${headerClass}" onclick="toggleRootNode('${nodeId}')">
+                        <span class="root-icon">${icon}</span>
+                        <span class="root-title">${node.display_name || node.name + '()'}</span>
+                        ${node.line ? `<span class="node-line">Line ${node.line}</span>` : ''}
+                        ${node.children ? `<span class="badge">${countChildren(node)} 调用</span>` : ''}
+                        <span class="root-trigger">${node.description || ''}</span>
+                        <span class="root-expand" id="${nodeId}-expand">▼</span>
+                    </div>
+                    <div class="root-body" id="${nodeId}-body">
+                        ${node.children ? node.children.map(child => renderTreeNode(child, 0)).join('') : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 渲染树节点
+        function renderTreeNode(node, depth) {
+            const nodeId = `node-${node.name}-${depth}-${Math.random().toString(36).substr(2, 9)}`;
+            const hasChildren = node.children && node.children.length > 0;
+            const nodeClass = getNodeClass(node.type);
+            const icon = getSmallNodeIcon(node);
+            
+            return `
+                <div class="tree-node">
+                    <div class="node-header" onclick="toggleNode('${nodeId}')" 
+                         onmouseenter="showTooltip(event, '${node.name}', '${node.description || ''}', '${node.time_info || ''}')"
+                         onmouseleave="hideTooltip()">
+                        <span class="node-toggle ${hasChildren ? '' : 'empty'}" id="${nodeId}-toggle">▶</span>
+                        <span class="node-icon">${icon}</span>
+                        <span class="node-name ${nodeClass}">${node.display_name || node.name + '()'}</span>
+                        ${node.line ? `<span class="node-line">:${node.line}</span>` : ''}
+                        ${node.description ? `<span class="node-desc">${truncate(node.description, 30)}</span>` : ''}
+                        ${node.time_info ? `<span class="node-time">⏱ ${node.time_info}</span>` : ''}
+                    </div>
+                    ${hasChildren ? `
+                        <div class="node-children" id="${nodeId}-children">
+                            ${node.children.map(child => renderTreeNode(child, depth + 1)).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        // 获取头部样式类
+        function getHeaderClass(name) {
+            if (name.includes('init')) return 'init';
+            if (name.includes('exit')) return 'exit';
+            if (name.includes('probe')) return 'probe';
+            if (name.includes('disconnect') || name.includes('remove')) return 'disconnect';
+            if (name.includes('open')) return 'open';
+            if (name.includes('close')) return 'close';
+            if (name.includes('write')) return 'write';
+            if (name.includes('read')) return 'read';
+            return '';
+        }
+        
+        // 获取节点样式类
+        function getNodeClass(type) {
+            switch(type) {
+                case 'entry_point': return 'entry-point';
+                case 'kernel_api': return 'kernel-api';
+                case 'recursive': return 'recursive';
+                case 'callback': return 'entry-point';
+                default: return '';
+            }
+        }
+        
+        // 获取节点图标
+        function getNodeIcon(node) {
+            const displayName = node.display_name || '';
+            if (displayName.includes('🚀')) return '🚀';
+            if (displayName.includes('🛑')) return '🛑';
+            if (displayName.includes('🔌')) return '🔌';
+            if (displayName.includes('⏏️')) return '⏏️';
+            if (displayName.includes('📂')) return '📂';
+            if (displayName.includes('📁')) return '📁';
+            if (displayName.includes('✏️')) return '✏️';
+            if (displayName.includes('📖')) return '📖';
+            return '📌';
+        }
+        
+        function getSmallNodeIcon(node) {
+            switch(node.type) {
+                case 'kernel_api': return '🔧';
+                case 'callback': return '📞';
+                case 'recursive': return '🔄';
+                case 'function': return '📎';
+                default: return '•';
+            }
+        }
+        
+        // 计算子节点数量
+        function countChildren(node) {
+            if (!node.children) return 0;
+            return node.children.reduce((sum, child) => sum + 1 + countChildren(child), 0);
+        }
+        
+        // 截断文本
+        function truncate(str, len) {
+            return str.length > len ? str.substr(0, len) + '...' : str;
+        }
+        
+        // 切换根节点展开/折叠
+        function toggleRootNode(nodeId) {
+            const body = document.getElementById(`${nodeId}-body`);
+            const expand = document.getElementById(`${nodeId}-expand`);
+            
+            body.classList.toggle('expanded');
+            expand.classList.toggle('expanded');
+        }
+        
+        // 切换树节点展开/折叠
+        function toggleNode(nodeId) {
+            const children = document.getElementById(`${nodeId}-children`);
+            const toggle = document.getElementById(`${nodeId}-toggle`);
+            
+            if (children) {
+                children.classList.toggle('expanded');
+                toggle.classList.toggle('expanded');
+            }
+        }
+        
+        // 全部展开
+        function expandAll() {
+            document.querySelectorAll('.root-body').forEach(el => el.classList.add('expanded'));
+            document.querySelectorAll('.root-expand').forEach(el => el.classList.add('expanded'));
+            document.querySelectorAll('.node-children').forEach(el => el.classList.add('expanded'));
+            document.querySelectorAll('.node-toggle:not(.empty)').forEach(el => el.classList.add('expanded'));
+        }
+        
+        // 全部折叠
+        function collapseAll() {
+            document.querySelectorAll('.root-body').forEach(el => el.classList.remove('expanded'));
+            document.querySelectorAll('.root-expand').forEach(el => el.classList.remove('expanded'));
+            document.querySelectorAll('.node-children').forEach(el => el.classList.remove('expanded'));
+            document.querySelectorAll('.node-toggle').forEach(el => el.classList.remove('expanded'));
+        }
+        
+        // 搜索函数
+        function searchFunctions(query) {
+            if (!query) {
+                document.querySelectorAll('.node-name').forEach(el => {
+                    el.innerHTML = el.textContent;
+                });
+                return;
+            }
+            
+            const regex = new RegExp(`(${query})`, 'gi');
+            document.querySelectorAll('.node-name').forEach(el => {
+                const text = el.textContent;
+                if (text.toLowerCase().includes(query.toLowerCase())) {
+                    el.innerHTML = text.replace(regex, '<span class="highlight">$1</span>');
+                    // 展开包含搜索结果的节点
+                    expandParents(el);
+                } else {
+                    el.innerHTML = text;
+                }
+            });
+        }
+        
+        // 展开父节点
+        function expandParents(el) {
+            let parent = el.closest('.node-children');
+            while (parent) {
+                parent.classList.add('expanded');
+                const toggle = parent.previousElementSibling?.querySelector('.node-toggle');
+                if (toggle) toggle.classList.add('expanded');
+                parent = parent.closest('.tree-node')?.parentElement?.closest('.node-children');
+            }
+            
+            // 也展开根节点
+            const rootBody = el.closest('.root-body');
+            if (rootBody) {
+                rootBody.classList.add('expanded');
+                rootBody.previousElementSibling?.querySelector('.root-expand')?.classList.add('expanded');
+            }
+        }
+        
+        // 滚动到函数
+        function scrollToFunction(name) {
+            const node = document.querySelector(`[data-function="${name}"]`);
+            if (node) {
+                node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                node.style.boxShadow = '0 0 0 2px var(--accent-blue)';
+                setTimeout(() => {
+                    node.style.boxShadow = '';
+                }, 2000);
+            }
+        }
+        
+        // 高亮结构体
+        function highlightStruct(type) {
+            // 可以扩展：高亮使用此结构体的函数
+            searchFunctions(type);
+        }
+        
+        // 工具提示
+        function showTooltip(event, name, desc, timeInfo) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.querySelector('.tooltip-title').textContent = name + '()';
+            
+            let descText = desc || '';
+            if (timeInfo) descText += (descText ? ' | ' : '') + '⏱ ' + timeInfo;
+            tooltip.querySelector('.tooltip-desc').textContent = descText;
+            
+            if (!descText) return;
+            
+            tooltip.style.left = event.pageX + 10 + 'px';
+            tooltip.style.top = event.pageY + 10 + 'px';
+            tooltip.classList.add('visible');
+        }
+        
+        function hideTooltip() {
+            document.getElementById('tooltip').classList.remove('visible');
+        }
+    </script>
+</body>
+</html>
+
